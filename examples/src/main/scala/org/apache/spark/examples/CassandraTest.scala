@@ -123,7 +123,7 @@ object CassandraTest {
         (outputkey, mutations)
       }
     }.saveAsNewAPIHadoopFile("casDemo", classOf[ByteBuffer], classOf[List[Mutation]],
-      classOf[ColumnFamilyOutputFormat], job.getConfiguration)
+      classOf[ColumnFamilyOutputFormat], job)
   }
 }
 

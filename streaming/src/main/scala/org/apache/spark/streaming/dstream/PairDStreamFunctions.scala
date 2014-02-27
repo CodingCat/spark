@@ -27,7 +27,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 import org.apache.hadoop.mapred.JobConf
-import org.apache.hadoop.mapreduce.{OutputFormat => NewOutputFormat}
+import org.apache.hadoop.mapreduce.{OutputFormat => NewOutputFormat, Job}
 import org.apache.hadoop.mapred.OutputFormat
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.streaming.{Time, Duration}
@@ -620,11 +620,11 @@ class PairDStreamFunctions[K: ClassTag, V: ClassTag](self: DStream[(K,V)])
       keyClass: Class[_],
       valueClass: Class[_],
       outputFormatClass: Class[_ <: NewOutputFormat[_, _]],
-      conf: Configuration = new Configuration
+      job: Job = new Job(new Configuration())
     ) {
     val saveFunc = (rdd: RDD[(K, V)], time: Time) => {
       val file = rddToFileName(prefix, suffix, time)
-      rdd.saveAsNewAPIHadoopFile(file, keyClass, valueClass, outputFormatClass, conf)
+      rdd.saveAsNewAPIHadoopFile(file, keyClass, valueClass, outputFormatClass, job)
     }
     self.foreachRDD(saveFunc)
   }

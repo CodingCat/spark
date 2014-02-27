@@ -599,9 +599,9 @@ class PairRDDFunctions[K: ClassTag, V: ClassTag](self: RDD[(K, V)])
       keyClass: Class[_],
       valueClass: Class[_],
       outputFormatClass: Class[_ <: NewOutputFormat[_, _]],
-      conf: Configuration = self.context.hadoopConfiguration)
+      job: NewAPIHadoopJob = new NewAPIHadoopJob(self.context.hadoopConfiguration))
   {
-    val job = new NewAPIHadoopJob(conf)
+    require(job.getConfiguration != null)
     job.setOutputKeyClass(keyClass)
     job.setOutputValueClass(valueClass)
     val wrappedConf = new SerializableWritable(job.getConfiguration)
@@ -642,7 +642,7 @@ class PairRDDFunctions[K: ClassTag, V: ClassTag](self: RDD[(K, V)])
     val jobTaskContext = newTaskAttemptContext(wrappedConf.value, jobAttemptId)
     val jobCommitter = jobFormat.getOutputCommitter(jobTaskContext)
     jobCommitter.setupJob(jobTaskContext)
-    val count = self.context.runJob(self, writeShard _).sum
+    self.context.runJob(self, writeShard _).sum
     jobCommitter.commitJob(jobTaskContext)
   }
 
