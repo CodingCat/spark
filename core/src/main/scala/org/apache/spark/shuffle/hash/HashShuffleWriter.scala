@@ -17,12 +17,11 @@
 
 package org.apache.spark.shuffle.hash
 
-import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleWriter}
-import org.apache.spark.{Logging, MapOutputTracker, SparkEnv, TaskContext}
+import org.apache.spark.shuffle.{MapStatus, MapOutputTracker, BaseShuffleHandle, ShuffleWriter}
+import org.apache.spark.{Logging, SparkEnv, TaskContext}
 import org.apache.spark.storage.{BlockObjectWriter}
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.executor.ShuffleWriteMetrics
-import org.apache.spark.scheduler.MapStatus
 
 class HashShuffleWriter[K, V](
     handle: BaseShuffleHandle[K, V, _],
@@ -37,14 +36,27 @@ class HashShuffleWriter[K, V](
 
   private val blockManager = SparkEnv.get.blockManager
   private val shuffleBlockManager = blockManager.shuffleBlockManager
-  private val ser = Serializer.getSerializer(dep.serializer.getOrElse(null))
+  private val ser = Serializer.getSerializer(dep.serializer.orNull)
   private val shuffle = shuffleBlockManager.forMapTask(dep.shuffleId, mapId, numOutputSplits, ser)
 
-  /** Write a record to this task's output */
-  override def write(record: Product2[K, V]): Unit = {
-    val pair = record.asInstanceOf[Product2[Any, Any]]
-    val bucketId = dep.partitioner.getPartition(pair._1)
-    shuffle.writers(bucketId).write(pair)
+  /** Write a bunch of records to this task's output */
+  override def write(records: Iterator[_ <: Product2[K, V]]): Unit = {
+    val iter = if (dep.aggregator.isDefined) {
+      if (dep.mapSideCombine) {
+        dep.aggregator.get.combineValuesByKey(records, context)
+      } else {
+        records
+      }
+    } else if (dep.aggregator.isEmpty && dep.mapSideCombine) {
+      throw new IllegalStateException("Aggregator is empty for map-side combine")
+    } else {
+      records
+    }
+
+    for (elem <- iter) {
+      val bucketId = dep.partitioner.getPartition(elem._1)
+      shuffle.writers(bucketId).write(elem)
+    }
   }
 
   /** Close this writer, passing along whether the map completed */
@@ -56,7 +68,7 @@ class HashShuffleWriter[K, V](
       stopping = true
       if (success) {
         try {
-          return Some(commitWritesAndBuildStatus())
+          Some(commitWritesAndBuildStatus())
         } catch {
           case e: Exception =>
             revertWrites()
@@ -64,7 +76,7 @@ class HashShuffleWriter[K, V](
         }
       } else {
         revertWrites()
-        return None
+        None
       }
     } finally {
       // Release the writers back to the shuffle block manager.

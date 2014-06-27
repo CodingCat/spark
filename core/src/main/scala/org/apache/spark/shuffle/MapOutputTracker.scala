@@ -15,19 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.spark
+package org.apache.spark.shuffle
 
 import java.io._
 import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 
-import scala.collection.mutable.{HashSet, HashMap, Map}
+import scala.collection.mutable.{HashMap, HashSet, Map}
 import scala.concurrent.Await
 
 import akka.actor._
 import akka.pattern.ask
-import org.apache.spark.scheduler.MapStatus
-import org.apache.spark.storage.BlockManagerId
+
+import org.apache.spark.{SparkException, Logging, SparkConf}
 import org.apache.spark.util._
+import org.apache.spark.storage.BlockManagerId
+
+import scala.collection.mutable
+import scala.concurrent.Await
 
 private[spark] sealed trait MapOutputTrackerMessage
 private[spark] case class GetMapOutputStatuses(shuffleId: Int)
@@ -168,8 +172,8 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
           return MapOutputTracker.convertMapStatuses(shuffleId, reduceId, fetchedStatuses)
         }
       } else {
-        throw new FetchFailedException(null, shuffleId, -1, reduceId,
-          new Exception("Missing all output locations for shuffle " + shuffleId))
+        throw new MetadataFetchFailedException(
+          shuffleId, reduceId, "Missing all output locations for shuffle " + shuffleId)
       }
     } else {
       statuses.synchronized {
@@ -182,6 +186,13 @@ private[spark] abstract class MapOutputTracker(conf: SparkConf) extends Logging 
   def getEpoch: Long = {
     epochLock.synchronized {
       return epoch
+    }
+  }
+
+  def incrementEpoch() {
+    epochLock.synchronized {
+      epoch += 1
+      logDebug("Increasing epoch to " + epoch)
     }
   }
 
@@ -279,13 +290,6 @@ private[spark] class MapOutputTrackerMaster(conf: SparkConf)
     cachedSerializedStatuses.contains(shuffleId) || mapStatuses.contains(shuffleId)
   }
 
-  def incrementEpoch() {
-    epochLock.synchronized {
-      epoch += 1
-      logDebug("Increasing epoch to " + epoch)
-    }
-  }
-
   def getSerializedMapOutputStatuses(shuffleId: Int): Array[Byte] = {
     var statuses: Array[MapStatus] = null
     var epochGotten: Long = -1
@@ -371,8 +375,8 @@ private[spark] object MapOutputTracker {
     statuses.map {
       status =>
         if (status == null) {
-          throw new FetchFailedException(null, shuffleId, -1, reduceId,
-            new Exception("Missing an output location for shuffle " + shuffleId))
+          throw new MetadataFetchFailedException(
+            shuffleId, reduceId, "Missing an output location for shuffle " + shuffleId)
         } else {
           (status.location, decompressSize(status.compressedSizes(reduceId)))
         }
