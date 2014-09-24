@@ -744,8 +744,9 @@ class SparkContext(config: SparkConf) extends Logging {
    * Create an [[org.apache.spark.Accumulator]] variable of a given type, which tasks can "add"
    * values to using the `+=` method. Only the driver can access the accumulator's `value`.
    */
-  def accumulator[T](initialValue: T)(implicit param: AccumulatorParam[T]) =
-    new Accumulator(initialValue, param)
+  def accumulator[T](initialValue: T, allowDuplicate: Boolean = true)
+                    (implicit param: AccumulatorParam[T]) =
+    new Accumulator(initialValue, param, None, allowDuplicate)
 
   /**
    * Create an [[org.apache.spark.Accumulator]] variable of a given type, with a name for display
@@ -762,8 +763,9 @@ class SparkContext(config: SparkConf) extends Logging {
    * @tparam T accumulator type
    * @tparam R type that can be added to the accumulator
    */
-  def accumulable[T, R](initialValue: T)(implicit param: AccumulableParam[T, R]) =
-    new Accumulable(initialValue, param)
+  def accumulable[T, R](initialValue: T, allowDuplicate: Boolean = true)
+                       (implicit param: AccumulableParam[T, R]) =
+    new Accumulable(initialValue, param, allowDuplicate)
 
   /**
    * Create an [[org.apache.spark.Accumulable]] shared variable, with a name for display in the
@@ -772,8 +774,9 @@ class SparkContext(config: SparkConf) extends Logging {
    * @tparam T accumulator type
    * @tparam R type that can be added to the accumulator
    */
-  def accumulable[T, R](initialValue: T, name: String)(implicit param: AccumulableParam[T, R]) =
-    new Accumulable(initialValue, param, Some(name))
+  def accumulable[T, R](initialValue: T, name: String, allowDuplicate: Boolean = true)
+                       (implicit param: AccumulableParam[T, R]) =
+    new Accumulable(initialValue, param, Some(name), allowDuplicate)
 
   /**
    * Create an accumulator from a "mutable collection" type.
@@ -782,9 +785,9 @@ class SparkContext(config: SparkConf) extends Logging {
    * standard mutable collections. So you can use this with mutable Map, Set, etc.
    */
   def accumulableCollection[R <% Growable[T] with TraversableOnce[T] with Serializable: ClassTag, T]
-      (initialValue: R): Accumulable[R, T] = {
+      (initialValue: R, allowDuplicate: Boolean = true): Accumulable[R, T] = {
     val param = new GrowableAccumulableParam[R,T]
-    new Accumulable(initialValue, param)
+    new Accumulable(initialValue, param, allowDuplicate)
   }
 
   /**
