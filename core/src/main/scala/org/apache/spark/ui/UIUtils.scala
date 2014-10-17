@@ -164,10 +164,10 @@ private[spark] object UIUtils extends Logging {
 
   /** Returns a spark page with correctly formatted headers */
   def headerSparkPage(
-      title: String,
-      content: => Seq[Node],
-      activeTab: SparkUITab,
-      refreshInterval: Option[Int] = None): Seq[Node] = {
+                       title: String,
+                       content: => Seq[Node],
+                       activeTab: SparkUITab,
+                       refreshInterval: Option[Int] = None): Seq[Node] = {
 
     val appName = activeTab.appName
     val shortAppName = if (appName.length < 36) appName else appName.take(32) + "..."
@@ -204,6 +204,59 @@ private[spark] object UIUtils extends Logging {
           </div>
           {content}
         </div>
+      </body>
+    </html>
+  }
+
+  /** Returns a spark page with correctly formatted headers */
+  def headerSparkPageWithMultipleTables(
+      title: String,
+      activeTab: SparkUITab,
+      refreshInterval: Option[Int],
+      subTitleContentPair: (String, _ => Seq[Node])*): Seq[Node] = {
+
+    val appName = activeTab.appName
+    val shortAppName = if (appName.length < 36) appName else appName.take(32) + "..."
+    val header = activeTab.headerTabs.map { tab =>
+      <li class={if (tab == activeTab) "active" else ""}>
+        <a href={prependBaseUri(activeTab.basePath, "/" + tab.prefix)}>{tab.name}</a>
+      </li>
+    }
+    val a = {
+      var ret: Seq[Node] = Seq[Node]()
+      for ((subTitle, content) <- subTitleContentPair) {
+        ret = ret ++ {
+          <div class="container-fluid">
+            <div class="row-fluid">
+              <div class="span12">
+                <h3 style="vertical-align: bottom; display: inline-block;">
+                  {subTitle}
+                </h3>
+              </div>
+            </div>{content}
+          </div>
+        }
+      }
+      ret
+    }
+    <html>
+      <head>
+        {commonHeaderNodes}
+        <title>{appName} - {title}</title>
+      </head>
+      <body>
+        <div class="navbar navbar-static-top">
+          <div class="navbar-inner">
+            <a href={prependBaseUri("/")} class="brand">
+              <img src={prependBaseUri("/static/spark-logo-77x50px-hd.png")} />
+            </a>
+            <ul class="nav">{header}</ul>
+            <p class="navbar-text pull-right">
+              <strong title={appName}>{shortAppName}</strong> application UI
+            </p>
+          </div>
+        </div>
+        {a}
       </body>
     </html>
   }
