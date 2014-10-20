@@ -19,7 +19,7 @@ package org.apache.spark
 
 import akka.actor.Actor
 import org.apache.spark.executor.TaskMetrics
-import org.apache.spark.storage.BlockManagerId
+import org.apache.spark.storage.{BlockStatus, BlockId, BlockManagerId}
 import org.apache.spark.scheduler.TaskScheduler
 import org.apache.spark.util.ActorLogReceive
 
@@ -30,7 +30,8 @@ import org.apache.spark.util.ActorLogReceive
 private[spark] case class Heartbeat(
     executorId: String,
     taskMetrics: Array[(Long, TaskMetrics)], // taskId -> TaskMetrics
-    blockManagerId: BlockManagerId)
+    blockManagerId: BlockManagerId,
+    broadcastBlocks: Map[BlockId, Option[BlockStatus]])
 
 private[spark] case class HeartbeatResponse(reregisterBlockManager: Boolean)
 
@@ -41,9 +42,11 @@ private[spark] class HeartbeatReceiver(scheduler: TaskScheduler)
   extends Actor with ActorLogReceive with Logging {
 
   override def receiveWithLogging = {
-    case Heartbeat(executorId, taskMetrics, blockManagerId) =>
+    case Heartbeat(executorId, taskMetrics, blockManagerId,
+      broadcastInfo) =>
       val response = HeartbeatResponse(
-        !scheduler.executorHeartbeatReceived(executorId, taskMetrics, blockManagerId))
+        !scheduler.executorHeartbeatReceived(executorId, taskMetrics, blockManagerId,
+          broadcastInfo))
       sender ! response
   }
 }

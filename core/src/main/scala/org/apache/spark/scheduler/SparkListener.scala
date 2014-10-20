@@ -25,7 +25,7 @@ import scala.collection.mutable
 import org.apache.spark.{Logging, TaskEndReason}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.executor.TaskMetrics
-import org.apache.spark.storage.BlockManagerId
+import org.apache.spark.storage.{BlockStatus, BlockId, BlockManagerId}
 import org.apache.spark.util.{Distribution, Utils}
 
 @DeveloperApi
@@ -85,7 +85,8 @@ case class SparkListenerUnpersistRDD(rddId: Int) extends SparkListenerEvent
 @DeveloperApi
 case class SparkListenerExecutorMetricsUpdate(
     execId: String,
-    taskMetrics: Seq[(Long, Int, Int, TaskMetrics)])
+    taskMetrics: Seq[(Long, Int, Int, TaskMetrics)],
+    broadcastInfo: Map[BlockId, Option[BlockStatus]])
   extends SparkListenerEvent
 
 @DeveloperApi
