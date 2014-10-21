@@ -86,7 +86,7 @@ case class SparkListenerUnpersistRDD(rddId: Int) extends SparkListenerEvent
 case class SparkListenerExecutorMetricsUpdate(
     execId: String,
     taskMetrics: Seq[(Long, Int, Int, TaskMetrics)],
-    broadcastInfo: Map[BlockId, Option[BlockStatus]])
+    broadcastInfo: Map[BlockId, BlockStatus])
   extends SparkListenerEvent
 
 @DeveloperApi
