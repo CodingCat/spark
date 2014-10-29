@@ -208,6 +208,7 @@ class SparkContext(config: SparkConf) extends SparkStatusAPI with Logging {
 
   // An asynchronous listener bus for Spark events
   private[spark] val listenerBus = new LiveListenerBus
+  listenerBus.filter = new DefaultSparkListenerEventFilter
 
   conf.set("spark.executor.id", "driver")
 

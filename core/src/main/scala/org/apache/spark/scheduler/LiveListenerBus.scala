@@ -41,6 +41,8 @@ private[spark] class LiveListenerBus extends SparkListenerBus with Logging {
   // A counter that represents the number of events produced and consumed in the queue
   private val eventLock = new Semaphore(0)
 
+  private[spark] var filter: DefaultSparkListenerEventFilter = null
+
   private val listenerThread = new Thread("SparkListenerBus") {
     setDaemon(true)
     override def run(): Unit = Utils.logUncaughtExceptions {
@@ -75,11 +77,13 @@ private[spark] class LiveListenerBus extends SparkListenerBus with Logging {
   }
 
   def post(event: SparkListenerEvent) {
-    val eventAdded = eventQueue.offer(event)
-    if (eventAdded) {
-      eventLock.release()
-    } else {
-      logQueueFullErrorMessage()
+    if (filter.validate(event)) {
+      val eventAdded = eventQueue.offer(event)
+      if (eventAdded) {
+        eventLock.release()
+      } else {
+        logQueueFullErrorMessage()
+      }
     }
   }
 

@@ -56,6 +56,11 @@ case class SparkListenerTaskEnd(
   extends SparkListenerEvent
 
 @DeveloperApi
+case class SparkListenerBlockUpdate(blockManagerId: BlockManagerId, blockId: BlockId,
+                                    blockStatus: BlockStatus)
+  extends SparkListenerEvent
+
+@DeveloperApi
 case class SparkListenerJobStart(jobId: Int, stageIds: Seq[Int], properties: Properties = null)
   extends SparkListenerEvent
 
@@ -98,6 +103,28 @@ case class SparkListenerApplicationEnd(time: Long) extends SparkListenerEvent
 /** An event used in the listener to shutdown the listener daemon thread. */
 private[spark] case object SparkListenerShutdown extends SparkListenerEvent
 
+
+/**
+ * :: DeveloperApi ::
+ * Interface for filtering the events from the Spark scheduler.
+ */
+@DeveloperApi
+class DefaultSparkListenerEventFilter {
+
+  def validate(event: SparkListenerEvent): Boolean = {
+    event match {
+      case SparkListenerBlockUpdate(blockManagerId: BlockManagerId, blockId: BlockId,
+        blockStatus: BlockStatus) =>
+        if (blockId.isBroadcast) {
+          true
+        } else {
+          false
+        }
+      case _ =>
+        true
+    }
+  }
+}
 
 /**
  * :: DeveloperApi ::
@@ -176,6 +203,11 @@ trait SparkListener {
    * Called when the driver receives task metrics from an executor in a heartbeat.
    */
   def onExecutorMetricsUpdate(executorMetricsUpdate: SparkListenerExecutorMetricsUpdate) { }
+
+  /**
+   * Called when the driver receives UpdateBlock from an BlockManagerSlaveActor.
+   */
+  def onBlockUpdate(blockUpdateEvent: SparkListenerBlockUpdate) { }
 }
 
 /**
