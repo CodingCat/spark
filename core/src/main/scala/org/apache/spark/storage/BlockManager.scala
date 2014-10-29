@@ -72,9 +72,6 @@ private[spark] class BlockManager(
 
   private val blockInfo = new TimeStampedHashMap[BlockId, BlockInfo]
 
-  // save the updated broadcastBlock info within a heartbeat interval
-  private var broadcastBlockUpdate: Map[BlockId, BlockStatus] = Map[BlockId, BlockStatus]()
-
   // Actual storage of where blocks are kept
   private var tachyonInitialized = false
   private[spark] val memoryStore = new MemoryStore(this, maxMemory)
@@ -277,7 +274,13 @@ private[spark] class BlockManager(
       info: BlockInfo,
       status: BlockStatus,
       droppedMemorySize: Long = 0L): Unit = {
-    val needReregister = !tryToReportBlockStatus(blockId, info, status, droppedMemorySize)
+    def ifAsync: Boolean = {
+      blockId.isBroadcast
+    }
+    // asynchronously report broadcast variables, in future we only need to change the implementation
+    // of ifAsync
+    val needReregister = !tryToReportBlockStatus(blockId, info, status, droppedMemorySize,
+      async = ifAsync)
     if (needReregister) {
       logInfo(s"Got told to re-register updating block $blockId")
       // Re-registering will report our new block for free.
@@ -295,14 +298,15 @@ private[spark] class BlockManager(
       blockId: BlockId,
       info: BlockInfo,
       status: BlockStatus,
-      droppedMemorySize: Long = 0L): Boolean = {
+      droppedMemorySize: Long = 0L,
+      async: Boolean = false): Boolean = {
     if (info.tellMaster) {
       val storageLevel = status.storageLevel
       val inMemSize = Math.max(status.memSize, droppedMemorySize)
       val inTachyonSize = status.tachyonSize
       val onDiskSize = status.diskSize
       master.updateBlockInfo(
-        blockManagerId, blockId, storageLevel, inMemSize, onDiskSize, inTachyonSize)
+        blockManagerId, blockId, storageLevel, inMemSize, onDiskSize, inTachyonSize, async)
     } else {
       true
     }
@@ -792,9 +796,6 @@ private[spark] class BlockManager(
         .format(blockId, Utils.getUsedTimeMs(startTimeMs)))
     }
 
-    // update the broadcastBlockUpdate
-    broadcastBlockUpdate ++= updatedBlocks.filter(_._1.isBroadcast).toMap
-
     updatedBlocks
   }
 
@@ -1030,17 +1031,6 @@ private[spark] class BlockManager(
           logWarning(s"Block $blockId could not be removed as it was not found in either " +
             "the disk, memory, or tachyon store")
         }
-        // update broadcastBlockUpdate
-        if (blockId.isBroadcast) {
-          val bs = getStatus(blockId)
-          broadcastBlockUpdate = broadcastBlockUpdate ++ {
-            if (bs != None) {
-              Map(blockId -> bs.get)
-            } else {
-              Map()
-            }
-          }
-        }
         blockInfo.remove(blockId)
         if (tellMaster && info.tellMaster) {
           val status = getCurrentBlockStatus(blockId, info)
@@ -1155,12 +1145,6 @@ private[spark] class BlockManager(
     metadataCleaner.cancel()
     broadcastCleaner.cancel()
     logInfo("BlockManager stopped")
-  }
-
-  def updatedBroadcastVars: Map[BlockId, BlockStatus] = broadcastBlockUpdate
-
-  def resetBroadcastVarsUpdateTrack: Unit = {
-    broadcastBlockUpdate = Map[BlockId, BlockStatus]()
   }
 }
 

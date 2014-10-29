@@ -30,8 +30,7 @@ import org.apache.spark.util.ActorLogReceive
 private[spark] case class Heartbeat(
     executorId: String,
     taskMetrics: Array[(Long, TaskMetrics)], // taskId -> TaskMetrics
-    blockManagerId: BlockManagerId,
-    broadcastBlocks: Map[BlockId, BlockStatus])
+    blockManagerId: BlockManagerId)
 
 private[spark] case class HeartbeatResponse(reregisterBlockManager: Boolean)
 
@@ -42,11 +41,9 @@ private[spark] class HeartbeatReceiver(scheduler: TaskScheduler)
   extends Actor with ActorLogReceive with Logging {
 
   override def receiveWithLogging = {
-    case Heartbeat(executorId, taskMetrics, blockManagerId,
-      broadcastInfo) =>
+    case Heartbeat(executorId, taskMetrics, blockManagerId) =>
       val response = HeartbeatResponse(
-        !scheduler.executorHeartbeatReceived(executorId, taskMetrics, blockManagerId,
-          broadcastInfo))
+        !scheduler.executorHeartbeatReceived(executorId, taskMetrics, blockManagerId))
       sender ! response
   }
 }
