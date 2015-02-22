@@ -42,7 +42,7 @@ private[spark] class ApplicationDescription(
       name, maxCores, memoryPerSlave, command, appUiUrl, eventLogDir, eventLogCodec)
 
   // only valid when spark.executor.multiPerWorker is set to true
-  var maxCorePerExecutor = maxCores
+  var maxCorePerExecutor = None
 
   override def toString: String = "ApplicationDescription(" + name + ")"
 }
