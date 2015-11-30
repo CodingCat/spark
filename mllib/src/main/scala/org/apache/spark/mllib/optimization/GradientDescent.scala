@@ -212,8 +212,8 @@ object GradientDescent extends Logging {
       }
     }
 
-    logInfo("GradientDescent.runMiniBatchSGD finished. Last 10 stochastic losses %s".format(
-      stochasticLossHistory.takeRight(10).mkString(", ")))
+    logInfo("GradientDescent.runMiniBatchSGD finished. Last 100 stochastic losses %s".format(
+      stochasticLossHistory.takeRight(100).mkString(", ")))
 
     (weights, stochasticLossHistory.toArray)
 
