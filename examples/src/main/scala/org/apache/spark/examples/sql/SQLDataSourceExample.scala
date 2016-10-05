@@ -32,10 +32,10 @@ object SQLDataSourceExample {
       .getOrCreate()
 
     runBasicDataSourceExample(spark)
-    runBasicParquetExample(spark)
-    runParquetSchemaMergingExample(spark)
-    runJsonDatasetExample(spark)
-    runJdbcDatasetExample(spark)
+    // runBasicParquetExample(spark)
+    // runParquetSchemaMergingExample(spark)
+    // runJsonDatasetExample(spark)
+    // runJdbcDatasetExample(spark)
 
     spark.stop()
   }
