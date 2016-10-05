@@ -84,8 +84,83 @@ case class DataSource(
   /**
    * Infer the schema of the given FileFormat, returns a pair of schema and partition column names.
    */
-  private def inferFileFormatSchema(format: FileFormat): (StructType, Seq[String]) = {
-    userSpecifiedSchema.map(_ -> partitionColumns).orElse {
+  private val spark2RemovedClasses = Set(
+    "org.apache.spark.sql.DataFrame",
+    "org.apache.spark.sql.sources.HadoopFsRelationProvider",
+    "org.apache.spark.Logging")
+
+  /** Given a provider name, look up the data source class definition. */
+  private def lookupDataSource(provider0: String): Class[_] = {
+    val provider = backwardCompatibilityMap.getOrElse(provider0, provider0)
+    val provider2 = s"$provider.DefaultSource"
+    val loader = Utils.getContextOrSparkClassLoader
+    val serviceLoader = ServiceLoader.load(classOf[DataSourceRegister], loader)
+
+    try {
+      serviceLoader.asScala.filter(_.shortName().equalsIgnoreCase(provider)).toList match {
+        // the provider format did not match any given registered aliases
+        case Nil =>
+          try {
+            Try(loader.loadClass(provider)).orElse(Try(loader.loadClass(provider2))) match {
+              case Success(dataSource) =>
+                println(dataSource.toString)
+                // Found the data source using fully qualified path
+                dataSource
+              case Failure(error) =>
+                if (provider.toLowerCase == "orc" ||
+                  provider.startsWith("org.apache.spark.sql.hive.orc")) {
+                  throw new AnalysisException(
+                    "The ORC data source must be used with Hive support enabled")
+                } else if (provider.toLowerCase == "avro" ||
+                  provider == "com.databricks.spark.avro") {
+                  throw new AnalysisException(
+                    s"Failed to find data source: ${provider.toLowerCase}. Please find an Avro " +
+                      "package at " +
+                      "https://cwiki.apache.org/confluence/display/SPARK/Third+Party+Projects")
+                } else {
+                  throw new ClassNotFoundException(
+                    s"Failed to find data source: $provider. Please find packages at " +
+                      "https://cwiki.apache.org/confluence/display/SPARK/Third+Party+Projects",
+                    error)
+                }
+            }
+          } catch {
+            case e: NoClassDefFoundError => // This one won't be caught by Scala NonFatal
+              // NoClassDefFoundError's class name uses "/" rather than "." for packages
+              val className = e.getMessage.replaceAll("/", ".")
+              if (spark2RemovedClasses.contains(className)) {
+                throw new ClassNotFoundException(s"$className was removed in Spark 2.0. " +
+                  "Please check if your library is compatible with Spark 2.0", e)
+              } else {
+                throw e
+              }
+          }
+        case head :: Nil =>
+          println("===" + head.getClass + "===")
+          // there is exactly one registered alias
+          head.getClass
+        case sources =>
+          // There are multiple registered aliases for the input
+          sys.error(s"Multiple sources found for $provider " +
+            s"(${sources.map(_.getClass.getName).mkString(", ")}), " +
+            "please specify the fully qualified class name.")
+      }
+    } catch {
+      case e: ServiceConfigurationError if e.getCause.isInstanceOf[NoClassDefFoundError] =>
+        // NoClassDefFoundError's class name uses "/" rather than "." for packages
+        val className = e.getCause.getMessage.replaceAll("/", ".")
+        if (spark2RemovedClasses.contains(className)) {
+          throw new ClassNotFoundException(s"Detected an incompatible DataSourceRegister. " +
+            "Please remove the incompatible library from classpath or upgrade it. " +
+            s"Error: ${e.getMessage}", e)
+        } else {
+          throw e
+        }
+    }
+  }
+
+  private def inferFileFormatSchema(format: FileFormat): StructType = {
+    userSpecifiedSchema.orElse {
       val caseInsensitiveOptions = new CaseInsensitiveMap(options)
       val allPaths = caseInsensitiveOptions.get("path")
       val globbedPaths = allPaths.toSeq.flatMap { path =>
