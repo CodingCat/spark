@@ -135,6 +135,38 @@ case class InMemoryTableScanExec(
 
   private val inMemoryPartitionPruningEnabled = sqlContext.conf.inMemoryPartitionPruning
 
+  private def filteredCachedBatches(): RDD[CachedBatch] = {
+    // Using these variables here to avoid serialization of entire objects (if referenced directly)
+    // within the map Partitions closure.
+    val schema = relation.partitionStatistics.schema
+    val schemaIndex = schema.zipWithIndex
+    val buffers = relation.cachedColumnBuffers
+
+    buffers.mapPartitionsWithIndexInternal { (index, cachedBatchIterator) =>
+      val partitionFilter = newPredicate(
+        partitionFilters.reduceOption(And).getOrElse(Literal(true)),
+        schema)
+      partitionFilter.initialize(index)
+      if (inMemoryPartitionPruningEnabled) {
+        cachedBatchIterator.filter { cachedBatch =>
+          if (!partitionFilter.eval(cachedBatch.stats)) {
+            def statsString: String = schemaIndex.map {
+              case (a, i) =>
+                val value = cachedBatch.stats.get(i, a.dataType)
+                s"${a.name}: $value"
+            }.mkString(", ")
+            logInfo(s"Skipping partition based on stats $statsString")
+            false
+          } else {
+            true
+          }
+        }
+      } else {
+        cachedBatchIterator
+      }
+    }
+  }
+
   protected override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
 
@@ -143,18 +175,9 @@ case class InMemoryTableScanExec(
       readBatches.setValue(0)
     }
 
-    // Using these variables here to avoid serialization of entire objects (if referenced directly)
-    // within the map Partitions closure.
-    val schema = relation.partitionStatistics.schema
-    val schemaIndex = schema.zipWithIndex
     val relOutput: AttributeSeq = relation.output
-    val buffers = relation.cachedColumnBuffers
 
-    buffers.mapPartitionsWithIndexInternal { (index, cachedBatchIterator) =>
-      val partitionFilter = newPredicate(
-        partitionFilters.reduceOption(And).getOrElse(Literal(true)),
-        schema)
-      partitionFilter.initialize(index)
+    filteredCachedBatches().mapPartitionsWithIndexInternal { (index, cachedBatchIterator) =>
 
       // Find the ordinals and data types of the requested columns.
       val (requestedColumnIndices, requestedColumnDataTypes) =
@@ -162,28 +185,8 @@ case class InMemoryTableScanExec(
           relOutput.indexOf(a.exprId) -> a.dataType
         }.unzip
 
-      // Do partition batch pruning if enabled
-      val cachedBatchesToScan =
-        if (inMemoryPartitionPruningEnabled) {
-          cachedBatchIterator.filter { cachedBatch =>
-            if (!partitionFilter.eval(cachedBatch.stats)) {
-              def statsString: String = schemaIndex.map {
-                case (a, i) =>
-                  val value = cachedBatch.stats.get(i, a.dataType)
-                  s"${a.name}: $value"
-              }.mkString(", ")
-              logInfo(s"Skipping partition based on stats $statsString")
-              false
-            } else {
-              true
-            }
-          }
-        } else {
-          cachedBatchIterator
-        }
-
       // update SQL metrics
-      val withMetrics = cachedBatchesToScan.map { batch =>
+      val withMetrics = cachedBatchIterator.map { batch =>
         if (enableAccumulators) {
           readBatches.add(1)
         }
