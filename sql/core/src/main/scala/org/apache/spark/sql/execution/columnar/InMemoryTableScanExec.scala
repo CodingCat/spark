@@ -78,7 +78,7 @@ case class InMemoryTableScanExec(
 
   override def inputRDDs(): Seq[RDD[InternalRow]] = {
     assert(supportCodegen)
-    val buffers = filteredCachedBatches()
+    val buffers = relation.cachedColumnBuffers // filteredCachedBatches()
     // HACK ALERT: This is actually an RDD[ColumnarBatch].
     // We're taking advantage of Scala's type erasure here to pass these batches along.
     Seq(buffers.map(createAndDecompressColumn(_)).asInstanceOf[RDD[InternalRow]])
@@ -227,15 +227,46 @@ case class InMemoryTableScanExec(
     // within the map Partitions closure.
     val relOutput: AttributeSeq = relation.output
 
-    filteredCachedBatches().mapPartitionsInternal { cachedBatchIterator =>
+    val schema = relation.partitionStatistics.schema
+    val schemaIndex = schema.zipWithIndex
+    val buffers = relation.cachedColumnBuffers
+
+    buffers.mapPartitionsWithIndexInternal { (index, cachedBatchIterator) =>
       // Find the ordinals and data types of the requested columns.
       val (requestedColumnIndices, requestedColumnDataTypes) =
         attributes.map { a =>
           relOutput.indexOf(a.exprId) -> a.dataType
         }.unzip
 
+      val partitionFilter = newPredicate(
+        partitionFilters.reduceOption(And).getOrElse(Literal(true)),
+        schema)
+      partitionFilter.initialize(index)
+
+      // Do partition batch pruning if enabled
+      val cachedBatchToScanIterator = {
+        if (inMemoryPartitionPruningEnabled) {
+          cachedBatchIterator.filter { cachedBatch =>
+            if (!partitionFilter.eval(cachedBatch.stats)) {
+              logDebug {
+                val statsString = schemaIndex.map { case (a, i) =>
+                  val value = cachedBatch.stats.get(i, a.dataType)
+                  s"${a.name}: $value"
+                }.mkString(", ")
+                s"Skipping partition based on stats $statsString"
+              }
+              false
+            } else {
+              true
+            }
+          }
+        } else {
+          cachedBatchIterator
+        }
+      }
+
       // update SQL metrics
-      val withMetrics = cachedBatchIterator.map { batch =>
+      val withMetrics = cachedBatchToScanIterator.map { batch =>
         if (enableAccumulators) {
           readBatches.add(1)
         }
