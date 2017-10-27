@@ -23,7 +23,7 @@ import java.sql.{Date, Timestamp}
 import org.apache.spark.sql.{DataFrame, QueryTest, Row}
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSet, In}
 import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
-import org.apache.spark.sql.execution.{FilterExec, LocalTableScanExec, WholeStageCodegenExec}
+import org.apache.spark.sql.execution.{FilterExec, InputAdapter, LocalTableScanExec, WholeStageCodegenExec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
@@ -456,6 +456,31 @@ class InMemoryColumnarQuerySuite extends QueryTest with SharedSQLContext {
   }
 
   test("SPARK-22348: table cache should do partition batch pruning") {
+    val df1 = Seq((1, 1), (1, 1), (2, 2)).toDF("x", "y")
+    df1.unpersist()
+    df1.cache()
+
+    // Push predicate to the cached table.
+    val df2 = df1.where("y = 3")
+
+    println(df2.queryExecution.executedPlan)
+
+    val planBeforeFilter = df2.queryExecution.executedPlan.collect {
+      case f: InputAdapter => f.child
+    }
+    // println(planBeforeFilter.head.getClass.getName)
+    // assert(planBeforeFilter.head.isInstanceOf[InMemoryTableScanExec])
+
+    /*
+    val execPlan = if (enabled == "true") {
+      WholeStageCodegenExec(planBeforeFilter.head)
+    } else {
+      planBeforeFilter.head
+    }
+    */
+    val execPlan = planBeforeFilter.head
+    assert(execPlan.executeCollectPublic().length == 0)
+    /*
     Seq("true", "false").foreach { enabled =>
       withSQLConf(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key -> enabled) {
         val df1 = Seq((1, 1), (1, 1), (2, 2)).toDF("x", "y")
@@ -468,18 +493,22 @@ class InMemoryColumnarQuerySuite extends QueryTest with SharedSQLContext {
         println(df2.queryExecution.executedPlan)
 
         val planBeforeFilter = df2.queryExecution.executedPlan.collect {
-          case f: FilterExec => f.child
+          case f: InputAdapter => f.child
         }
-        println(planBeforeFilter.head.getClass.getName)
+        // println(planBeforeFilter.head.getClass.getName)
         // assert(planBeforeFilter.head.isInstanceOf[InMemoryTableScanExec])
 
+        /*
         val execPlan = if (enabled == "true") {
           WholeStageCodegenExec(planBeforeFilter.head)
         } else {
           planBeforeFilter.head
         }
+        */
+        val execPlan = planBeforeFilter.head
         assert(execPlan.executeCollectPublic().length == 0)
       }
     }
+    */
   }
 }
