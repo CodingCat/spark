@@ -137,9 +137,17 @@ object SQLConf {
   val IN_MEMORY_PARTITION_PRUNING =
     buildConf("spark.sql.inMemoryColumnarStorage.partitionPruning")
       .internal()
-      .doc("When true, enable partition pruning for in-memory columnar tables.")
+      .doc("When true, enable partition batch pruning for in-memory columnar tables.")
       .booleanConf
       .createWithDefault(true)
+
+  val IN_MEMORY_PARTITION_METADATA =
+    buildConf("spark.sql.inMemoryColumnarStorage.partitionMetadata")
+      .internal()
+      .doc("When true, spark sql will collect partition level stats for in-memory columnar tables and" +
+        " do coarse-grained pruning")
+      .booleanConf
+      .createWithDefault(false)
 
   val PREFER_SORTMERGEJOIN = buildConf("spark.sql.join.preferSortMergeJoin")
     .internal()
