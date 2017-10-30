@@ -144,8 +144,8 @@ object SQLConf {
   val IN_MEMORY_PARTITION_METADATA =
     buildConf("spark.sql.inMemoryColumnarStorage.partitionMetadata")
       .internal()
-      .doc("When true, spark sql will collect partition level stats for in-memory columnar tables and" +
-        " do coarse-grained pruning")
+      .doc("When true, spark sql will collect partition level stats for in-memory columnar" +
+        " tables and do coarse-grained pruning")
       .booleanConf
       .createWithDefault(false)
 
