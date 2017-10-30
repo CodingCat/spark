@@ -1142,6 +1142,8 @@ class SQLConf extends Serializable with Logging {
 
   def inMemoryPartitionPruning: Boolean = getConf(IN_MEMORY_PARTITION_PRUNING)
 
+  def inMemoryPartitionMetadata: Boolean = getConf(IN_MEMORY_PARTITION_METADATA)
+
   def columnNameOfCorruptRecord: String = getConf(COLUMN_NAME_OF_CORRUPT_RECORD)
 
   def broadcastTimeout: Long = getConf(BROADCAST_TIMEOUT)
