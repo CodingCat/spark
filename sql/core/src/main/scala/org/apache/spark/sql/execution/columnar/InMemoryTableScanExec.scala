@@ -181,7 +181,7 @@ case class InMemoryTableScanExec(
 
   private val inMemoryPartitionPruningEnabled = sqlContext.conf.inMemoryPartitionPruning
 
-  private def filterCachedBatchesInternal(
+  private def doFilterCachedBatches(
       cachedBatchIterator: Iterator[CachedBatch],
       partitionStatsSchema: Seq[AttributeReference],
       partitionFilter: GenPredicate): Iterator[CachedBatch] = {
@@ -223,11 +223,12 @@ case class InMemoryTableScanExec(
             if (!partitionFilter.eval(partitionStats)) {
               Iterator[CachedBatch]()
             } else {
-              filterCachedBatchesInternal(iterForPartitionCase.map(_.asInstanceOf[CachedBatch]),
+              doFilterCachedBatches(iterForPartitionCase.map(_.asInstanceOf[CachedBatch]),
                 schema, partitionFilter)
             }
           case _: CachedBatch =>
-            iterForDefault.map(_.asInstanceOf[CachedBatch])
+            doFilterCachedBatches(iterForDefault.map(_.asInstanceOf[CachedBatch]), schema,
+              partitionFilter)
         }
       }
     }
