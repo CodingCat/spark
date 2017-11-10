@@ -223,10 +223,10 @@ case class InMemoryTableScanExec(
           if !partitionFilter.eval(cachedIter.partitionStats) =>
           // scalastyle:off
           println(s"skipped partition $index")
-          // scalastyle:on
           Iterator()
         case _ =>
           doFilterCachedBatches(cachedBatchIterator, schema, partitionFilter)
+          // scalastyle:on
       }
     }
   }
