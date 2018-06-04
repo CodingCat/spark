@@ -241,6 +241,13 @@ class ParquetSchemaPruningSuite
     }
   }
 
+  private def withContactTables(testThunk: => Unit) {
+    info("testing table without partition data column")
+    withContacts(testThunk)
+    info("testing table with partition data column")
+    withContactsWithDataPartitionColumn(testThunk)
+  }
+
   private def withContacts(testThunk: => Unit) {
     withTempPath { dir =>
       val path = dir.getCanonicalPath
