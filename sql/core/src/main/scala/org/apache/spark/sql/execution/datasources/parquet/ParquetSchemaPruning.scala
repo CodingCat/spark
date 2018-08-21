@@ -18,11 +18,11 @@
 package org.apache.spark.sql.execution.datasources.parquet
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.PhysicalOperation
+import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema, SelectedField}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{ProjectionOverSchema, SelectedField}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructField, StructType}
 
@@ -74,6 +74,13 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         } else {
           op
         }
+      case op @ PhysicalOperation(projects, filters, dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
+        // scalastyle:off
+        projects.foreach(projector => println(projector.qualifiedName))
+        println("================")
+        filters.foreach(filter => println(filter.prettyName))
+        // scalastyle:on
+        op
     }
 
   /**
