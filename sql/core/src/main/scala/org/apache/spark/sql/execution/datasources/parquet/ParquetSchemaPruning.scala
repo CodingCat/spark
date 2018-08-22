@@ -76,9 +76,9 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         }
       case op @ PhysicalOperation(projects, filters, dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
         // scalastyle:off
-        println("================")
+       /* println("================")
         projects.foreach(projector => println(projector.qualifiedName))
-        println("================")
+        println("================")*/
         // filters.foreach(filter => println(filter.verboseString))
         // scalastyle:on
         op
