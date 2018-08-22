@@ -78,7 +78,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         // scalastyle:off
         projects.foreach(projector => println(projector.qualifiedName))
         println("================")
-        filters.foreach(filter => println(filter.prettyName))
+        filters.foreach(filter => println(filter.verboseString))
         // scalastyle:on
         op
     }
