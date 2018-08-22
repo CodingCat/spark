@@ -221,9 +221,6 @@ abstract class Optimizer(sessionCatalog: SessionCatalog)
     }
     def apply(plan: LogicalPlan): LogicalPlan = plan transformAllExpressions {
       case s: SubqueryExpression =>
-        // scalastyle:off
-        println("executing OptimizeSubqueries")
-        // scalastyle:on
         val Subquery(newPlan) = Optimizer.this.execute(Subquery(s.plan))
         // At this point we have an optimized subquery plan that we are going to attach
         // to this subquery expression. Here we can safely remove any top level sort
