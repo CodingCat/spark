@@ -74,15 +74,19 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         } else {
           op
         }
-      // scalastyle:off
-      /*
     case op @ PhysicalOperation(projects, filters, dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
-     /* println("================")
-      projects.foreach(projector => println(projector.qualifiedName))
-      println("================")*/
+      // println("================")
+      // scalastyle:off
+      // projects.foreach(projector => println(projector.qualifiedName))
+      val projectionRootFields = projects.flatMap(getRootFields)
+      val filterRootFields = filters.flatMap(getRootFields)
+      val requestedRootFields = (projectionRootFields ++ filterRootFields).distinct
+      println("requested fields:")
+      requestedRootFields.foreach(rootField => println(rootField.field.name))
+      // println("================")
       // filters.foreach(filter => println(filter.verboseString))
       // scalastyle:on
-      op*/
+      op
     }
 
   /**
