@@ -79,6 +79,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
       // println("================")
       // scalastyle:off
       // projects.foreach(projector => println(projector.qualifiedName))
+      println(s"plan is: ${plan.toString}")
       println("projects:")
       projects.foreach(exp => println(exp.qualifiedName))
       val projectionRootFields = projects.flatMap(getRootFields)
