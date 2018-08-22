@@ -34,12 +34,16 @@ import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructField, St
  * SQL column, and a nested Parquet column corresponds to a [[StructField]].
  */
 private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
-  override def apply(plan: LogicalPlan): LogicalPlan =
+  override def apply(plan: LogicalPlan): LogicalPlan = {
+    // scalastyle:off
+    println(s"plan is: ${plan.toString}")
+    // scalastyle:on
     if (SQLConf.get.nestedSchemaPruningEnabled) {
       apply0(plan)
     } else {
       plan
     }
+  }
 
   private def apply0(plan: LogicalPlan): LogicalPlan =
     plan transformDown {
@@ -79,7 +83,6 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
       // println("================")
       // scalastyle:off
       // projects.foreach(projector => println(projector.qualifiedName))
-      println(s"plan is: ${plan.toString}")
       println("projects:")
       projects.foreach(exp => println(exp.qualifiedName))
       val projectionRootFields = projects.flatMap(getRootFields)
