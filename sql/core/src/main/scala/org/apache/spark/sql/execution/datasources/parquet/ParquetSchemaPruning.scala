@@ -74,18 +74,13 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         } else {
           op
         }
-      case op =>
+      case op @ PhysicalOperation(projects, filters, dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
         // scalastyle:off
-        /*
-      projects.foreach(projector => println(projector.qualifiedName))
-      println("================")
-      filters.foreach(filter => println(filter.prettyName))
-      // scalastyle:on
-      op*/
-        println("unmatched:" + op)
+        projects.foreach(projector => println(projector.qualifiedName))
+        println("================")
+        filters.foreach(filter => println(filter.prettyName))
         // scalastyle:on
         op
-
     }
 
   /**
