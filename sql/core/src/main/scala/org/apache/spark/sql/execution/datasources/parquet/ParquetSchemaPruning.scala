@@ -55,7 +55,6 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         if (requestedRootFields.exists { root: RootField => !root.derivedFromAtt }) {
           val dataSchema = hadoopFsRelation.dataSchema
           val prunedDataSchema = pruneDataSchema(dataSchema, requestedRootFields)
-
           // If the data schema is different from the pruned data schema, continue. Otherwise,
           // return op. We effect this comparison by counting the number of "leaf" fields in
           // each schemata, assuming the fields in prunedDataSchema are a subset of the fields
