@@ -104,6 +104,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
                 att.withExprId(outputIdMap(att.name))
               case att => att
             }
+        println(s"prunedRelationOutput: ${prunedRelationOutput}")
         val prunedDSV2Relation = prunedDSV2Relation1.copy(output = prunedRelationOutput)
         val projectionOverSchema = ProjectionOverSchema(prunedSchema)
 
