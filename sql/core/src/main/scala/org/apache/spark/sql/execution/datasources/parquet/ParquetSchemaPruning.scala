@@ -83,6 +83,9 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
       val requestedRootFields = (projectionRootFields ++ filterRootFields).distinct
       if (requestedRootFields.exists { case RootField(_, derivedFromAtt) => !derivedFromAtt }) {
         val prunedSchema = StructType.fromAttributes(output)
+        // scalastyle:off
+        println("prunedSchema:")
+        prunedSchema.printTreeString()
         // TODO: why do we need sort fields?
         val prunedDSV2Relation1 = dsv2.copy(userSpecifiedSchema = Some(prunedSchema))
         // We need to replace the expression ids of the pruned relation output attributes
