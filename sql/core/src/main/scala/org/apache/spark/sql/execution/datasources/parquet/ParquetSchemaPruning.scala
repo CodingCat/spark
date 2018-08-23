@@ -87,7 +87,6 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           .reduceLeft(_ merge _)
         val prunedSchema = mergedSchema
         // scalastyle:off
-        println(s"output ${output.map(_.name).mkString("\n")}")
         println("prunedSchema:")
         prunedSchema.printTreeString()
         // TODO: why do we need sort fields?
