@@ -82,7 +82,10 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
       val filterRootFields = filters.flatMap(getRootFields)
       val requestedRootFields = (projectionRootFields ++ filterRootFields).distinct
       if (requestedRootFields.exists { case RootField(_, derivedFromAtt) => !derivedFromAtt }) {
-        val prunedSchema = StructType.fromAttributes(output)
+        val mergedSchema = requestedRootFields
+          .map { case RootField(field, _) => StructType(Array(field)) }
+          .reduceLeft(_ merge _)
+        val prunedSchema = mergedSchema
         // scalastyle:off
         println(s"output ${output.map(_.name).mkString("\n")}")
         println("prunedSchema:")
