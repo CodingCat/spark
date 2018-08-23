@@ -84,7 +84,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
       if (requestedRootFields.exists { case RootField(_, derivedFromAtt) => !derivedFromAtt }) {
         val prunedSchema = StructType.fromAttributes(output)
         // scalastyle:off
-        println(s"output ${output.map(_.prettyName).mkString("\n")}")
+        println(s"output ${output.map(_.name).mkString("\n")}")
         println("prunedSchema:")
         prunedSchema.printTreeString()
         // TODO: why do we need sort fields?
