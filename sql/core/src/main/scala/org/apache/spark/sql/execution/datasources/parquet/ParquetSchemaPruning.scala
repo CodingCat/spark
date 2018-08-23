@@ -96,7 +96,8 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         // references to the original relation's output are not broken
         val outputIdMap = dsv2.output.map(att => (att.name, att.exprId)).toMap
         val prunedRelationOutput = prunedDSV2Relation1
-            .schema
+            .userSpecifiedSchema
+            .get
             .toAttributes
             .map {
               case att if outputIdMap.contains(att.name) =>
