@@ -35,9 +35,6 @@ import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StructField, St
  */
 private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = {
-    // scalastyle:off
-    println(s"plan is: ${plan.toString}")
-    // scalastyle:on
     if (SQLConf.get.nestedSchemaPruningEnabled) {
       apply0(plan)
     } else {
@@ -79,21 +76,55 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         } else {
           op
         }
-    case op @ PhysicalOperation(projects, filters, dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
-      // println("================")
-      // scalastyle:off
-      // projects.foreach(projector => println(projector.qualifiedName))
-      println("projects:")
-      projects.foreach(exp => println(exp.qualifiedName))
+    case op @ PhysicalOperation(projects, filters,
+      dsv2 @ DataSourceV2Relation(_, output, _, _, _)) =>
       val projectionRootFields = projects.flatMap(getRootFields)
       val filterRootFields = filters.flatMap(getRootFields)
       val requestedRootFields = (projectionRootFields ++ filterRootFields).distinct
-      // println("requested fields:")
-      // requestedRootFields.foreach(rootField => println(rootField.field.name))
-      // println("================")
-      // filters.foreach(filter => println(filter.verboseString))
-      // scalastyle:on
-      op
+      if (requestedRootFields.exists { case RootField(_, derivedFromAtt) => !derivedFromAtt }) {
+        val prunedSchema = StructType.fromAttributes(output)
+        // TODO: why do we need sort fields?
+        val prunedDSV2Relation = dsv2.copy(userSpecifiedSchema = Some(prunedSchema))
+        // We need to replace the expression ids of the pruned relation output attributes
+        // with the expression ids of the original relation output attributes so that
+        // references to the original relation's output are not broken
+        val outputIdMap = dsv2.output.map(att => (att.name, att.exprId)).toMap
+        val prunedRelationOutput = prunedDSV2Relation
+            .schema
+            .toAttributes
+            .map {
+              case att if outputIdMap.contains(att.name) =>
+                att.withExprId(outputIdMap(att.name))
+              case att => att
+            }
+        val projectionOverSchema = ProjectionOverSchema(prunedSchema)
+
+        // Construct a new target for our projection by rewriting and
+        // including the original filters where available
+        val projectionChild =
+        if (filters.nonEmpty) {
+          val projectedFilters = filters.map(_.transformDown {
+            case projectionOverSchema(expr) => expr
+          })
+          val newFilterCondition = projectedFilters.reduce(And)
+          Filter(newFilterCondition, prunedDSV2Relation)
+        } else {
+          prunedDSV2Relation
+        }
+
+        // Construct the new projections of our [[Project]] by
+        // rewriting the original projections
+        val newProjects = projects.map(_.transformDown {
+          case projectionOverSchema(expr) => expr
+        }).map { case expr: NamedExpression => expr }
+
+        logDebug(s"New projects:\n${newProjects.map(_.treeString).mkString("\n")}")
+        logDebug(s"Pruned data schema:\n${prunedSchema.treeString}")
+
+        Project(newProjects, projectionChild)
+      } else {
+        op
+      }
     }
 
   /**
