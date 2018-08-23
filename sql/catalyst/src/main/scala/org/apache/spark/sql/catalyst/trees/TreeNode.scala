@@ -255,6 +255,7 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
     val afterRule = CurrentOrigin.withOrigin(origin) {
       rule.applyOrElse(this, identity[BaseType])
     }
+    // scalastyle:off
 
     // Check if unchanged and then possibly return old copy to avoid gc churn.
     if (this fastEquals afterRule) {
@@ -262,6 +263,8 @@ abstract class TreeNode[BaseType <: TreeNode[BaseType]] extends Product {
     } else {
       afterRule.mapChildren(_.transformDown(rule))
     }
+
+    // scalastyle:on
   }
 
   /**
