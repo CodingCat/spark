@@ -86,19 +86,6 @@ private[parquet] class ParquetReadSupport(val convertTz: Option[TimeZone],
     val parquetRequestedSchema = ParquetReadSupport.clipParquetSchema(
       context.getFileSchema, catalystRequestedSchema, caseSensitive)
 
-    val parquetRequestedSchema = if (parquetMrCompatibility) {
-      // Parquet-mr will throw an exception if we try to read a superset of the file's schema.
-      // Therefore, we intersect our clipped schema with the underlying file's schema
-      ParquetReadSupport.intersectParquetGroups(clippedParquetSchema, context.getFileSchema)
-        .map(intersectionGroup =>
-          new MessageType(intersectionGroup.getName, intersectionGroup.getFields))
-        .getOrElse(ParquetSchemaConverter.EMPTY_MESSAGE)
-    } else {
-      // Spark's built-in Parquet reader will throw an exception in some cases if the requested
-      // schema is not the same as the clipped schema
-      clippedParquetSchema
-    }
-
     new ReadContext(parquetRequestedSchema, Map.empty[String, String].asJava)
   }
 
