@@ -77,7 +77,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           op
         }
     case op @ PhysicalOperation(projects, filters,
-      dsv2 @ DataSourceV2Relation(_, output, _, _, _)) =>
+      dsv2 @ DataSourceV2Relation(_, output, _, _, _, _)) =>
       val projectionRootFields = projects.flatMap(getRootFields)
       val filterRootFields = filters.flatMap(getRootFields)
       val requestedRootFields = (projectionRootFields ++ filterRootFields).distinct
