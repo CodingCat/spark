@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution.datasources.parquet
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema, SelectedField}
+import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.SelectedField
@@ -77,13 +77,13 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           op
         }
     case op @ PhysicalOperation(projects, filters,
-      dsv2 @ DataSourceV2Relation(_, output, _, _, _, _)) =>
+      dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
       val projectionRootFields = projects.flatMap(getRootFields)
       val filterRootFields = filters.flatMap(getRootFields)
       val requestedRootFields = (projectionRootFields ++ filterRootFields).distinct
-      if (requestedRootFields.exists { case RootField(_, derivedFromAtt) => !derivedFromAtt }) {
+      if (requestedRootFields.exists { case RootField(_, derivedFromAtt, _) => !derivedFromAtt }) {
         val mergedSchema = requestedRootFields
-          .map { case RootField(field, _) => StructType(Array(field)) }
+          .map { case RootField(field, _, _) => StructType(Array(field)) }
           .reduceLeft(_ merge _)
         val prunedSchema = mergedSchema
         // scalastyle:off
