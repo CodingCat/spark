@@ -219,21 +219,24 @@ class ParquetSchemaPruningSuite
 
   testStandardAndLegacyModes("aggregation over nested data") {
     withParquetTable(contacts, "contacts") {
-      val query = sql("select count(distinct name.last), address from contacts group by address " +
-        "order by address")
-      checkScanSchemata(query, "struct<address:string,name:struct<last:string>>")
-      checkAnswer(query,
-        Row(1, "123 Main Street") ::
-          Row(1, "321 Wall Street") :: Nil)
+      withSQLConf(SQLConf.NESTED_SCHEMA_PRUNING_ENABLED.key -> "true") {
+        val query = sql("select count(distinct name.last), address from contacts group" +
+          " by address order by address")
+        checkScanSchemata(query, "struct<address:string,name:struct<last:string>>")
+        checkAnswer(query,
+          Row(1, "123 Main Street") ::
+            Row(1, "321 Wall Street") :: Nil)
+      }
     }
   }
 
   testStandardAndLegacyModes("select function over nested data") {
     withParquetTable(contacts, "contacts") {
-      val query = sql("select count(name.middle) from contacts")
-      checkScanSchemata(query, "struct<name:struct<middle:string>>")
-      checkAnswer(query,
-        Row(2) :: Nil)
+      withSQLConf(SQLConf.NESTED_SCHEMA_PRUNING_ENABLED.key -> "true") {
+        val query = sql("select count(name.middle) from contacts")
+        checkScanSchemata(query, "struct<name:struct<middle:string>>")
+        checkAnswer(query, Row(2) :: Nil)
+      }
     }
   }
 
