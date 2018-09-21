@@ -49,7 +49,8 @@ class ParquetSchemaPruningJoinSuite extends QueryTest
   testStandardAndLegacyModes("schema pruning join 1") {
     asParquetTable(upperCaseStructData, "r1") {
       asParquetTable(lowerCaseStructData, "r2") {
-        withSQLConf(SQLConf.CASE_SENSITIVE.key -> "true") {
+        withSQLConf(SQLConf.CASE_SENSITIVE.key -> "true",
+          SQLConf.NESTED_SCHEMA_PRUNING_ENABLED.key -> "true") {
           def join(joinType: String): DataFrame =
             sql(s"select s.n from r1 $joinType join r2 on r1.S.N = r2.s.n")
           val scanSchema1 = "struct<S:struct<N:int>>"
