@@ -20,7 +20,7 @@ package org.apache.spark.sql.catalyst.optimizer
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 
-object AggregationFieldExtractionPushdown extends FieldExtractionPushdown {
+object AggregateFieldExtractionPushdown extends FieldExtractionPushdown {
   override protected def apply0(plan: LogicalPlan): LogicalPlan =
     plan transformDown {
       case agg @ Aggregate(groupingExpressions, aggregateExpressions, child) =>
