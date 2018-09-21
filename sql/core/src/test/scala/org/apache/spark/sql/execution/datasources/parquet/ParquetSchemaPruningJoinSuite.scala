@@ -26,7 +26,13 @@ class ParquetSchemaPruningJoinSuite extends QueryTest
   with ParquetTest
   with FileSchemaPruningTest
   with SharedSQLContext {
+
   setupTestData()
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    spark.sessionState.conf.setConf(SQLConf.NESTED_SCHEMA_PRUNING_ENABLED, true)
+  }
 
   private lazy val upperCaseStructData: DataFrame = {
     val df = sql("select named_struct(\"N\", N, \"L\", L) as S from uppercasedata")
@@ -49,8 +55,7 @@ class ParquetSchemaPruningJoinSuite extends QueryTest
   testStandardAndLegacyModes("schema pruning join 1") {
     asParquetTable(upperCaseStructData, "r1") {
       asParquetTable(lowerCaseStructData, "r2") {
-        withSQLConf(SQLConf.CASE_SENSITIVE.key -> "true",
-          SQLConf.NESTED_SCHEMA_PRUNING_ENABLED.key -> "true") {
+        withSQLConf(SQLConf.CASE_SENSITIVE.key -> "true") {
           def join(joinType: String): DataFrame =
             sql(s"select s.n from r1 $joinType join r2 on r1.S.N = r2.s.n")
           val scanSchema1 = "struct<S:struct<N:int>>"
