@@ -42,7 +42,7 @@ private[sql] trait FileSchemaPruningTest {
     df.collect()
   }
 
-  private def checkScanSchemata(df: DataFrame, expectedSchemaCatalogStrings: String*): Unit = {
+  protected def checkScanSchemata(df: DataFrame, expectedSchemaCatalogStrings: String*): Unit = {
     val fileSourceScanSchemata =
       df.queryExecution.executedPlan.collect {
         case scan: FileSourceScanExec => scan.requiredSchema
