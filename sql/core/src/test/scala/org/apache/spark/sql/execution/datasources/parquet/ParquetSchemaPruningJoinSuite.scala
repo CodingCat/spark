@@ -34,6 +34,11 @@ class ParquetSchemaPruningJoinSuite extends QueryTest
     spark.sessionState.conf.setConf(SQLConf.NESTED_SCHEMA_PRUNING_ENABLED, true)
   }
 
+  protected override def afterAll(): Unit = {
+    super.afterAll()
+    spark.sessionState.conf.setConf(SQLConf.NESTED_SCHEMA_PRUNING_ENABLED, false)
+  }
+
   private lazy val upperCaseStructData: DataFrame = {
     val df = sql("select named_struct(\"N\", N, \"L\", L) as S from uppercasedata")
     df.createOrReplaceTempView("upperCaseStruct")
