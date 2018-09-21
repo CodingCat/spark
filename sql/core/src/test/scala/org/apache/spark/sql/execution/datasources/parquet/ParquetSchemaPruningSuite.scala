@@ -91,17 +91,6 @@ class ParquetSchemaPruningSuite
     checkAnswer(query.orderBy("id"), Row("X.") :: Row("Y.") :: Row(null) :: Row(null) :: Nil)
   }
 
-  testSchemaPruning("select a single complex field and its parent struct") {
-    val query = sql("select name.middle, name from contacts")
-    checkScan(query, "struct<name:struct<first:string,middle:string,last:string>>")
-    checkAnswer(query.orderBy("id"),
-      Row("X.", Row("Jane", "X.", "Doe")) ::
-      Row("Y.", Row("John", "Y.", "Doe")) ::
-      Row(null, Row("Janet", null, "Jones")) ::
-      Row(null, Row("Jim", null, "Jones")) ::
-      Nil)
-  }
-
   testSchemaPruning("select a single complex field array and its parent struct array") {
     val query = sql("select friends.middle, friends from contacts where p=1")
     checkScan(query,
@@ -131,27 +120,6 @@ class ParquetSchemaPruningSuite
       Row("Y.", Row("John", "Y.", "Doe")) ::
       Row(null, Row("Janet", null, "Jones")) ::
       Row(null, Row("Jim", null, "Jones")) ::
-      Nil)
-  }
-
-  testSchemaPruning("select a single complex field array and its parent struct array") {
-    val query = sql("select friends.middle, friends from contacts where p=1")
-    checkScan(query,
-      "struct<friends:array<struct<first:string,middle:string,last:string>>>")
-    checkAnswer(query.orderBy("id"),
-      Row(Array("Z."), Array(Row("Susan", "Z.", "Smith"))) ::
-      Row(Array.empty[String], Array.empty[Row]) ::
-      Nil)
-  }
-
-  testSchemaPruning("select a single complex field from a map entry and its parent map entry") {
-    val query =
-      sql("select relatives[\"brother\"].middle, relatives[\"brother\"] from contacts where p=1")
-    checkScan(query,
-      "struct<relatives:map<string,struct<first:string,middle:string,last:string>>>")
-    checkAnswer(query.orderBy("id"),
-      Row("Y.", Row("John", "Y.", "Doe")) ::
-      Row(null, null) ::
       Nil)
   }
 
