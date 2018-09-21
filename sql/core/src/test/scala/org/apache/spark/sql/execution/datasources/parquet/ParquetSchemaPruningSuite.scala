@@ -249,6 +249,26 @@ class ParquetSchemaPruningSuite
       Row("Y.") :: Nil)
   }
 
+  testStandardAndLegacyModes("aggregation over nested data") {
+    withParquetTable(contacts, "contacts") {
+      val query = sql("select count(distinct name.last), address from contacts group by address " +
+        "order by address")
+      checkScanSchemata(query, "struct<address:string,name:struct<last:string>>")
+      checkAnswer(query,
+        Row(1, "123 Main Street") ::
+          Row(1, "321 Wall Street") :: Nil)
+    }
+  }
+
+  testStandardAndLegacyModes("select function over nested data") {
+    withParquetTable(contacts, "contacts") {
+      val query = sql("select count(name.middle) from contacts")
+      checkScanSchemata(query, "struct<name:struct<middle:string>>")
+      checkAnswer(query,
+        Row(2) :: Nil)
+    }
+  }
+
   private def testSchemaPruning(testName: String)(testThunk: => Unit) {
     test(s"Spark vectorized reader - without partition data column - $testName") {
       withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_ENABLED.key -> "true") {
