@@ -21,7 +21,7 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet, Named
 import org.apache.spark.sql.catalyst.planning.PhysicalOperation
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan, Project}
 
-class JoinFieldExtractionPushdown extends FieldExtractionPushdown {
+object JoinFieldExtractionPushdown extends FieldExtractionPushdown {
   override protected def apply0(plan: LogicalPlan): LogicalPlan =
     plan transformDown {
       case op@PhysicalOperation(projects, Seq(),
