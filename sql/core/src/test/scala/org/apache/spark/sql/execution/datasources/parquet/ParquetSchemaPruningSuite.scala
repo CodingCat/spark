@@ -222,7 +222,7 @@ class ParquetSchemaPruningSuite
       withSQLConf(SQLConf.NESTED_SCHEMA_PRUNING_ENABLED.key -> "true") {
         val query = sql("select count(distinct name.last), address from contacts group" +
           " by address order by address")
-        checkScanSchemata(query, "struct<address:string,name:struct<last:string>>")
+        checkScanSchemata(query, "struct<name:struct<last:string>,address:string>")
         checkAnswer(query,
           Row(1, "123 Main Street") ::
             Row(1, "321 Wall Street") :: Nil)
