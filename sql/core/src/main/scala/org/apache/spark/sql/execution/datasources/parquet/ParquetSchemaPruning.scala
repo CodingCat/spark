@@ -89,6 +89,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         if (dsv2.userSpecifiedSchema.isEmpty ||
           (countLeaves(dsv2.userSpecifiedSchema.get) > countLeaves(prunedSchema))) {
           // scalastyle:off
+          println(s"${dsv2.userSpecifiedSchema.isEmpty}")
           println("prunedSchema:")
           prunedSchema.printTreeString()
           // TODO: why do we need sort fields?
