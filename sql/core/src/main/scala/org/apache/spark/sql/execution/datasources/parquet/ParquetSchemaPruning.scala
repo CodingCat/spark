@@ -86,16 +86,18 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           .map { case RootField(field, _, _) => StructType(Array(field)) }
           .reduceLeft(_ merge _)
         val prunedSchema = mergedSchema
-        // scalastyle:off
-        println("prunedSchema:")
-        prunedSchema.printTreeString()
-        // TODO: why do we need sort fields?
-        val prunedDSV2Relation1 = dsv2.copy(userSpecifiedSchema = Some(prunedSchema))
-        // We need to replace the expression ids of the pruned relation output attributes
-        // with the expression ids of the original relation output attributes so that
-        // references to the original relation's output are not broken
-        val outputIdMap = dsv2.output.map(att => (att.name, att.exprId)).toMap
-        val prunedRelationOutput = prunedDSV2Relation1
+        if (dsv2.userSpecifiedSchema.isEmpty ||
+          (countLeaves(dsv2.userSpecifiedSchema.get) > countLeaves(prunedSchema))) {
+          // scalastyle:off
+          println("prunedSchema:")
+          prunedSchema.printTreeString()
+          // TODO: why do we need sort fields?
+          val prunedDSV2Relation1 = dsv2.copy(userSpecifiedSchema = Some(prunedSchema))
+          // We need to replace the expression ids of the pruned relation output attributes
+          // with the expression ids of the original relation output attributes so that
+          // references to the original relation's output are not broken
+          val outputIdMap = dsv2.output.map(att => (att.name, att.exprId)).toMap
+          val prunedRelationOutput = prunedDSV2Relation1
             .userSpecifiedSchema
             .get
             .toAttributes
@@ -104,33 +106,36 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
                 att.withExprId(outputIdMap(att.name))
               case att => att
             }
-        println(s"prunedRelationOutput: ${prunedRelationOutput}")
-        val prunedDSV2Relation = prunedDSV2Relation1.copy(output = prunedRelationOutput)
-        val projectionOverSchema = ProjectionOverSchema(prunedSchema)
+          println(s"prunedRelationOutput: ${prunedRelationOutput}")
+          val prunedDSV2Relation = prunedDSV2Relation1.copy(output = prunedRelationOutput)
+          val projectionOverSchema = ProjectionOverSchema(prunedSchema)
 
-        // Construct a new target for our projection by rewriting and
-        // including the original filters where available
-        val projectionChild =
-        if (filters.nonEmpty) {
-          val projectedFilters = filters.map(_.transformDown {
+          // Construct a new target for our projection by rewriting and
+          // including the original filters where available
+          val projectionChild =
+          if (filters.nonEmpty) {
+            val projectedFilters = filters.map(_.transformDown {
+              case projectionOverSchema(expr) => expr
+            })
+            val newFilterCondition = projectedFilters.reduce(And)
+            Filter(newFilterCondition, prunedDSV2Relation)
+          } else {
+            prunedDSV2Relation
+          }
+
+          // Construct the new projections of our [[Project]] by
+          // rewriting the original projections
+          val newProjects = projects.map(_.transformDown {
             case projectionOverSchema(expr) => expr
-          })
-          val newFilterCondition = projectedFilters.reduce(And)
-          Filter(newFilterCondition, prunedDSV2Relation)
+          }).map { case expr: NamedExpression => expr }
+
+          logDebug(s"New projects:\n${newProjects.map(_.treeString).mkString("\n")}")
+          logDebug(s"Pruned data schema:\n${prunedSchema.treeString}")
+
+          Project(newProjects, projectionChild)
         } else {
-          prunedDSV2Relation
+          op
         }
-
-        // Construct the new projections of our [[Project]] by
-        // rewriting the original projections
-        val newProjects = projects.map(_.transformDown {
-          case projectionOverSchema(expr) => expr
-        }).map { case expr: NamedExpression => expr }
-
-        logDebug(s"New projects:\n${newProjects.map(_.treeString).mkString("\n")}")
-        logDebug(s"Pruned data schema:\n${prunedSchema.treeString}")
-
-        Project(newProjects, projectionChild)
       } else {
         op
       }
