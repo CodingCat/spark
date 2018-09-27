@@ -18,10 +18,9 @@
 package org.apache.spark.sql.execution.datasources.parquet
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema}
+import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema, SelectedField}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.SelectedField
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.internal.SQLConf
@@ -48,7 +47,8 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           l @ LogicalRelation(hadoopFsRelation: HadoopFsRelation, _, _, _))
         if canPruneRelation(hadoopFsRelation) =>
         val (normalizedProjects, normalizedFilters) =
-          normalizeAttributeRefNames(l, projects, filters)
+          normalizeAttributeRefNames(l.output.map(att => (att.exprId, att.name)).toMap,
+            projects, filters)
         val requestedRootFields = identifyRootFields(normalizedProjects, normalizedFilters)
 
         // If requestedRootFields includes a nested field, continue. Otherwise,
@@ -78,9 +78,10 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         }
     case op @ PhysicalOperation(projects, filters,
       dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
-      val projectionRootFields = projects.flatMap(getRootFields)
-      val filterRootFields = filters.flatMap(getRootFields)
-      val requestedRootFields = (projectionRootFields ++ filterRootFields).distinct
+      val (normalizedProjects, normalizedFilters) =
+        normalizeAttributeRefNames(dsv2.output.map(att => (att.exprId, att.name)).toMap,
+          projects, filters)
+      val requestedRootFields = identifyRootFields(normalizedProjects, normalizedFilters)
       if (requestedRootFields.exists { case RootField(_, derivedFromAtt, _) => !derivedFromAtt }) {
         val mergedSchema = requestedRootFields
           .map { case RootField(field, _, _) => StructType(Array(field)) }
@@ -154,10 +155,9 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
    * fields by name. Returns a tuple with the normalized projects and filters, respectively.
    */
   private def normalizeAttributeRefNames(
-      logicalRelation: LogicalRelation,
+      normalizedAttNameMap: Map[ExprId, String],
       projects: Seq[NamedExpression],
       filters: Seq[Expression]): (Seq[NamedExpression], Seq[Expression]) = {
-    val normalizedAttNameMap = logicalRelation.output.map(att => (att.exprId, att.name)).toMap
     val normalizedProjects = projects.map(_.transform {
       case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
         att.withName(normalizedAttNameMap(att.exprId))
