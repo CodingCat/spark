@@ -90,6 +90,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           (countLeaves(dsv2.userSpecifiedSchema.get) > countLeaves(prunedSchema))) {
           // scalastyle:off
           println(s"${dsv2.userSpecifiedSchema.isEmpty}")
+          requestedRootFields.foreach(println)
           println("prunedSchema:")
           prunedSchema.printTreeString()
           // TODO: why do we need sort fields?
@@ -107,7 +108,6 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
                 att.withExprId(outputIdMap(att.name))
               case att => att
             }
-          println(s"prunedRelationOutput: ${prunedRelationOutput}")
           val prunedDSV2Relation = prunedDSV2Relation1.copy(output = prunedRelationOutput)
           val projectionOverSchema = ProjectionOverSchema(prunedSchema)
 
