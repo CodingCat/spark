@@ -76,8 +76,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         } else {
           op
         }
-    case op @ PhysicalOperation(projects, filters,
-      dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
+    case op @ PhysicalOperation(projects, filters, dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
       val (normalizedProjects, normalizedFilters) =
         normalizeAttributeRefNames(dsv2.output.map(att => (att.exprId, att.name)).toMap,
           projects, filters)
@@ -90,6 +89,8 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         if (dsv2.userSpecifiedSchema.isEmpty ||
           (countLeaves(dsv2.userSpecifiedSchema.get) > countLeaves(prunedSchema))) {
           // scalastyle:off
+          println("projections:")
+          projects.foreach(exp => println(exp.name))
           println(s"${dsv2.userSpecifiedSchema.isEmpty}")
           requestedRootFields.foreach(println)
           println("prunedSchema:")
