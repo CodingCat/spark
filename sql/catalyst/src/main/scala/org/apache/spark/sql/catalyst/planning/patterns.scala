@@ -39,6 +39,15 @@ object PhysicalOperation extends PredicateHelper {
     Some((fields.getOrElse(child.output), filters, child))
   }
 
+  private def allDeterministic(field: NamedExpression): Boolean = {
+    if (field.children.forall(_.deterministic)) {
+      true
+    } else {
+      field.children.filterNot(child => child.nodeName.contains("rand()") ||
+        child.nodeName.contains("randn()")).forall(_.deterministic)
+    }
+  }
+
   /**
    * Collects all deterministic projects and filters, in-lining/substituting aliases if necessary.
    * Here are two examples for alias in-lining/substitution.
@@ -56,7 +65,7 @@ object PhysicalOperation extends PredicateHelper {
   private def collectProjectsAndFilters(plan: LogicalPlan):
       (Option[Seq[NamedExpression]], Seq[Expression], LogicalPlan, Map[Attribute, Expression]) =
     plan match {
-      case Project(fields, child) if fields.forall(_.deterministic) =>
+      case Project(fields, child) if fields.forall(allDeterministic) =>
         val (_, filters, other, aliases) = collectProjectsAndFilters(child)
         val substitutedFields = fields.map(substitute(aliases)).asInstanceOf[Seq[NamedExpression]]
         (Some(substitutedFields), filters, other, collectAliases(substitutedFields))
