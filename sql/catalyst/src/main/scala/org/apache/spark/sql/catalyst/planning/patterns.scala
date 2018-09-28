@@ -43,8 +43,8 @@ object PhysicalOperation extends PredicateHelper {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
-      field.children.filterNot(child => child.nodeName.contains("rand()") ||
-        child.nodeName.contains("randn()")).forall(_.deterministic)
+      field.children.filterNot(child => child.nodeName.contains("rand(") ||
+        child.nodeName.contains("randn(")).forall(_.deterministic)
     }
   }
 
