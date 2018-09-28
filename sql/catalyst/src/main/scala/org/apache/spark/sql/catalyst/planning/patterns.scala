@@ -39,16 +39,19 @@ object PhysicalOperation extends PredicateHelper {
     Some((fields.getOrElse(child.output), filters, child))
   }
 
+  private def printChild(exp: Expression): Unit = {
+    // scalastyle:off
+    println(exp.nodeName)
+    exp.children.foreach(printChild)
+    println("========")
+  }
+
   private def allDeterministic(field: NamedExpression): Boolean = {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
-      // scalastyle:off
-      println(field.name)
-      println("=========")
-      field.children.foreach(c => println(c.nodeName))
-      field.children.filterNot(child => child.nodeName.contains("rand(") ||
-        child.nodeName.contains("randn(")).forall(_.deterministic)
+      printChild(field)
+      false
     }
   }
 
