@@ -43,6 +43,10 @@ object PhysicalOperation extends PredicateHelper {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
+      // scalastyle:off
+      println(field.name)
+      println("=========")
+      field.children.foreach(c => println(c.nodeName))
       field.children.filterNot(child => child.nodeName.contains("rand(") ||
         child.nodeName.contains("randn(")).forall(_.deterministic)
     }
