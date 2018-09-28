@@ -46,12 +46,12 @@ object PhysicalOperation extends PredicateHelper {
     println("========")
   }
 
-  private def allDeterministic(field: NamedExpression): Boolean = {
+  private def allDeterministic(field: Expression): Boolean = {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
-      printChild(field)
-      false
+      field.children.filterNot(c => c.nodeName != "Rand" && c.nodeName != "Randn").
+        forall(allDeterministic)
     }
   }
 
