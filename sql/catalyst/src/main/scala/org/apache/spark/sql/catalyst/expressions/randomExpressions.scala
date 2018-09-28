@@ -105,7 +105,20 @@ object Rand {
   def apply(seed: Long): Rand = Rand(Literal(seed, LongType))
 }
 
-case class RandD(child: Expression) extends UnaryExpression with ExpectsInputTypes
+// scalastyle:off line.size.limit
+@ExpressionDescription(
+  usage = "_FUNC_([seed]) - Returns a random value with independent and identically distributed (i.i.d.) uniformly distributed values in [0, 1).",
+  examples = """
+    Examples:
+      > SELECT _FUNC_();
+       0.9629742951434543
+      > SELECT _FUNC_(0);
+       0.8446490682263027
+      > SELECT _FUNC_(null);
+       0.8446490682263027
+  """,
+  note = "The function is non-deterministic in general case.")
+case class Randd(child: Expression) extends UnaryExpression with ExpectsInputTypes
   with ExpressionWithRandomSeed {
 
   // fixed seed
@@ -154,7 +167,7 @@ case class RandD(child: Expression) extends UnaryExpression with ExpectsInputTyp
   final override lazy val deterministic: Boolean = true
 }
 
-object RandD {
+object Randd {
   def apply(seed: Long): Rand = Rand(Literal(seed, LongType))
 }
 
