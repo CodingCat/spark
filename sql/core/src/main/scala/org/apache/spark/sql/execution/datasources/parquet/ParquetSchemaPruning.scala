@@ -301,10 +301,10 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           println(s"occur in IsNull(SelectedField(field)), $field")
         }
         RootField(field, derivedFromAtt = false, contentAccessed = false) :: Nil
-      case IsNotNull(a: Attribute) | IsNull(b: Attribute) =>
+      case IsNotNull(_: Attribute) | IsNull(_: Attribute) =>
         if (expr.isInstanceOf[NamedExpression] &&
           expr.asInstanceOf[NamedExpression].name == "occurred_at") {
-          println(s"occur in IsNotNull(a: Attribute) | IsNull(b: Attribute) , $a, $b")
+          println(s"occur in IsNotNull(a: Attribute) | IsNull(b: Attribute)")
         }
         expr.children.flatMap(getRootFields).map(_.copy(contentAccessed = false))
       case _ =>
