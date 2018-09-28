@@ -151,8 +151,6 @@ case class Randd(child: Expression) extends UnaryExpression with ExpectsInputTyp
 
   override def withNewSeed(seed: Long): Rand = Rand(Literal(seed, LongType))
 
-  protected def evalInternal(input: InternalRow): Double = rng.nextDouble()
-
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val className = classOf[XORShiftRandom].getName
     val rngTerm = ctx.addMutableState(className, "rng")
@@ -161,6 +159,10 @@ case class Randd(child: Expression) extends UnaryExpression with ExpectsInputTyp
     ev.copy(code = code"""
       final ${CodeGenerator.javaType(dataType)} ${ev.value} = $rngTerm.nextDouble();""",
       isNull = FalseLiteral)
+  }
+
+  override def eval(input: InternalRow = null): Any = {
+    rng.nextDouble()
   }
 
   // hacky
