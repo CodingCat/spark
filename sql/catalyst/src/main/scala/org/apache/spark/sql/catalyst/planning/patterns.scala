@@ -50,7 +50,7 @@ object PhysicalOperation extends PredicateHelper {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
-      field.children.filterNot(c => c.nodeName != "Rand" && c.nodeName != "Randn").
+      field.children.filterNot(c => c.nodeName == "Rand" || c.nodeName == "Randn").
         forall(allDeterministic)
     }
   }
