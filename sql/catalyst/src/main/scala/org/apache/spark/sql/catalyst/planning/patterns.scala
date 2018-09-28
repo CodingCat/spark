@@ -41,15 +41,16 @@ object PhysicalOperation extends PredicateHelper {
 
   private def printChild(exp: Expression): Unit = {
     // scalastyle:off
+    println("+++++++++")
     println(exp.nodeName)
     exp.children.foreach(printChild)
-    println("========")
   }
 
   private def allDeterministic(field: Expression): Boolean = {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
+      printChild(field)
       field.children.filterNot(c => c.nodeName == "Rand" || c.nodeName == "Randn").
         forall(allDeterministic)
     }
