@@ -105,6 +105,59 @@ object Rand {
   def apply(seed: Long): Rand = Rand(Literal(seed, LongType))
 }
 
+case class RandD(child: Expression) extends UnaryExpression with ExpectsInputTypes
+  with ExpressionWithRandomSeed {
+
+  // fixed seed
+  def this() = this(Literal(0L, LongType))
+
+  /**
+   * Record ID within each partition. By being transient, the Random Number Generator is
+   * reset every time we serialize and deserialize and initialize it.
+   */
+  @transient protected var rng: XORShiftRandom = _
+
+  protected def initializeInternal(): Unit = {
+    rng = new XORShiftRandom(seed)
+  }
+
+  initializeInternal()
+
+  @transient protected lazy val seed: Long = child match {
+    case Literal(s, IntegerType) => s.asInstanceOf[Int]
+    case Literal(s, LongType) => s.asInstanceOf[Long]
+    case _ => throw new AnalysisException(
+      s"Input argument to $prettyName must be an integer, long or null literal.")
+  }
+
+  override def nullable: Boolean = false
+
+  override def dataType: DataType = DoubleType
+
+  override def inputTypes: Seq[AbstractDataType] = Seq(TypeCollection(IntegerType, LongType))
+
+  override def withNewSeed(seed: Long): Rand = Rand(Literal(seed, LongType))
+
+  protected def evalInternal(input: InternalRow): Double = rng.nextDouble()
+
+  override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    val className = classOf[XORShiftRandom].getName
+    val rngTerm = ctx.addMutableState(className, "rng")
+    ctx.addPartitionInitializationStatement(
+      s"$rngTerm = new $className(${seed}L);")
+    ev.copy(code = code"""
+      final ${CodeGenerator.javaType(dataType)} ${ev.value} = $rngTerm.nextDouble();""",
+      isNull = FalseLiteral)
+  }
+
+  // hacky
+  final override lazy val deterministic: Boolean = true
+}
+
+object RandD {
+  def apply(seed: Long): Rand = Rand(Literal(seed, LongType))
+}
+
 /** Generate a random column with i.i.d. values drawn from the standard normal distribution. */
 // scalastyle:off line.size.limit
 @ExpressionDescription(
