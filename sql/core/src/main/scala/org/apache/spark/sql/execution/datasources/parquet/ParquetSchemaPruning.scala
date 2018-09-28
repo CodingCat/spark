@@ -90,7 +90,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
           (countLeaves(dsv2.userSpecifiedSchema.get) > countLeaves(prunedSchema))) {
           // scalastyle:off
           println("projections:")
-          projects.foreach(exp => println(exp.name))
+          projects.foreach(exp => println(exp.qualifiedName))
           println(s"${dsv2.userSpecifiedSchema.isEmpty}")
           requestedRootFields.foreach(println)
           println("prunedSchema:")

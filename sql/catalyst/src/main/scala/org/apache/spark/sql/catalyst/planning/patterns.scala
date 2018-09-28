@@ -46,13 +46,13 @@ object PhysicalOperation extends PredicateHelper {
     exp.children.foreach(printChild)
   }
 
-  private def allDeterministic(field: Expression): Boolean = {
+  private def deterministicExcludingRand(field: Expression): Boolean = {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
       printChild(field)
       field.children.filterNot(c => c.nodeName == "Rand" || c.nodeName == "Randn").
-        forall(allDeterministic)
+        forall(deterministicExcludingRand)
     }
   }
 
@@ -73,7 +73,7 @@ object PhysicalOperation extends PredicateHelper {
   private def collectProjectsAndFilters(plan: LogicalPlan):
       (Option[Seq[NamedExpression]], Seq[Expression], LogicalPlan, Map[Attribute, Expression]) =
     plan match {
-      case Project(fields, child) if fields.forall(allDeterministic) =>
+      case Project(fields, child) if fields.forall(deterministicExcludingRand) =>
         val (_, filters, other, aliases) = collectProjectsAndFilters(child)
         val substitutedFields = fields.map(substitute(aliases)).asInstanceOf[Seq[NamedExpression]]
         (Some(substitutedFields), filters, other, collectAliases(substitutedFields))
