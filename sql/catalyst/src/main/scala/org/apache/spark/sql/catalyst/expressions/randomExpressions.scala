@@ -151,7 +151,7 @@ case class Randd(child: Expression) extends UnaryExpression with ExpectsInputTyp
 
   override def inputTypes: Seq[AbstractDataType] = Seq(TypeCollection(IntegerType, LongType))
 
-  override def withNewSeed(seed: Long): Rand = Rand(Literal(seed, LongType))
+  override def withNewSeed(seed: Long): Randd = Randd(Literal(seed, LongType))
 
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val className = classOf[XORShiftRandom].getName
@@ -172,7 +172,7 @@ case class Randd(child: Expression) extends UnaryExpression with ExpectsInputTyp
 }
 
 object Randd {
-  def apply(seed: Long): Rand = Rand(Literal(seed, LongType))
+  def apply(seed: Long): Randd = Randd(Literal(seed, LongType))
 }
 
 /** Generate a random column with i.i.d. values drawn from the standard normal distribution. */
