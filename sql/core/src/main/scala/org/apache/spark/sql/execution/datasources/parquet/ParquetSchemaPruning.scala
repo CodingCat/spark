@@ -174,8 +174,9 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
    * Returns the set of fields from the Parquet file that the query plan needs.
    */
   private def identifyRootFields(projects: Seq[NamedExpression], filters: Seq[Expression]) = {
-    val projectionRootFields = projects.flatMap(getRootFields)
-    val filterRootFields = filters.flatMap(getRootFields)
+    val projectionRootFields = projects.flatMap(field => getRootFields(field,
+      field.name.contains("occur")))
+    val filterRootFields = filters.flatMap(getRootFields(_))
 
     // Kind of expressions don't need to access any fields of a root fields, e.g., `IsNotNull`.
     // For them, if there are any nested fields accessed in the query, we don't need to add root
@@ -271,18 +272,16 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
    * When expr is an [[Attribute]], construct a field around it and indicate that that
    * field was derived from an attribute.
    */
-  private def getRootFields(expr: Expression): Seq[RootField] = {
+  private def getRootFields(expr: Expression, print: Boolean = false): Seq[RootField] = {
     // scalastyle:off
     expr match {
       case att: Attribute =>
-        if (expr.isInstanceOf[NamedExpression] &&
-          expr.asInstanceOf[NamedExpression].name == "occurred_at") {
+        if (expr.isInstanceOf[NamedExpression] && print) {
           println(s"occur in Attribute, ${att.name}")
         }
         RootField(StructField(att.name, att.dataType, att.nullable), derivedFromAtt = true) :: Nil
       case SelectedField(field) =>
-        if (expr.isInstanceOf[NamedExpression] &&
-          expr.asInstanceOf[NamedExpression].name == "occurred_at") {
+        if (expr.isInstanceOf[NamedExpression] && print) {
           println(s"occur in SelectedField(field), $field")
         }
         RootField(field, derivedFromAtt = false) :: Nil
@@ -290,29 +289,25 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
       // don't actually use any nested fields. These root field accesses might be excluded later
       // if there are any nested fields accesses in the query plan.
       case IsNotNull(SelectedField(field)) =>
-        if (expr.isInstanceOf[NamedExpression] &&
-          expr.asInstanceOf[NamedExpression].name == "occurred_at") {
+        if (expr.isInstanceOf[NamedExpression] && print) {
           println(s"occur in IsNotNull(SelectedField(field)), $field")
         }
         RootField(field, derivedFromAtt = false, contentAccessed = false) :: Nil
       case IsNull(SelectedField(field)) =>
-        if (expr.isInstanceOf[NamedExpression] &&
-          expr.asInstanceOf[NamedExpression].name == "occurred_at") {
+        if (expr.isInstanceOf[NamedExpression] && print) {
           println(s"occur in IsNull(SelectedField(field)), $field")
         }
         RootField(field, derivedFromAtt = false, contentAccessed = false) :: Nil
       case IsNotNull(_: Attribute) | IsNull(_: Attribute) =>
-        if (expr.isInstanceOf[NamedExpression] &&
-          expr.asInstanceOf[NamedExpression].name == "occurred_at") {
+        if (expr.isInstanceOf[NamedExpression] && print) {
           println(s"occur in IsNotNull(a: Attribute) | IsNull(b: Attribute)")
         }
-        expr.children.flatMap(getRootFields).map(_.copy(contentAccessed = false))
+        expr.children.flatMap(getRootFields(_, print)).map(_.copy(contentAccessed = false))
       case _ =>
-        if (expr.isInstanceOf[NamedExpression] &&
-          expr.asInstanceOf[NamedExpression].name == "occurred_at") {
+        if (expr.isInstanceOf[NamedExpression] && print) {
           println(s"occur in others")
         }
-        expr.children.flatMap(getRootFields)
+        expr.children.flatMap(getRootFields(_, print))
     }
   }
 
