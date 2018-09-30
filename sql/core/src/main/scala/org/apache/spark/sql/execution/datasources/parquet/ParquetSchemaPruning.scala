@@ -132,7 +132,9 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
             case projectionOverSchema(expr) => expr
           }).map { case expr: NamedExpression => expr }
 
-          logDebug(s"New projects:\n${newProjects.map(_.treeString).mkString("\n")}")
+          newProjects.map(_.toAttribute)
+
+          logInfo(s"New projects:\n${newProjects.map(_.treeString).mkString("\n")}")
           logDebug(s"Pruned data schema:\n${prunedSchema.treeString}")
 
           Project(newProjects, projectionChild)
@@ -177,9 +179,6 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
     val projectionRootFields = projects.flatMap(field => getRootFields(field,
       field.name.contains("occur")))
     val filterRootFields = filters.flatMap(field => getRootFields(field, false))
-
-    println(s"projects count: ${projectionRootFields.length}," +
-      s" filter length: ${filterRootFields.length}")
 
     // Kind of expressions don't need to access any fields of a root fields, e.g., `IsNotNull`.
     // For them, if there are any nested fields accessed in the query, we don't need to add root
@@ -365,6 +364,6 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
    * was derived from an attribute or had a proper child. `contentAccessed` means whether
    * it was accessed with its content by the expressions refer it.
    */
-  private case class RootField(field: StructField, derivedFromAtt: Boolean,
+  case class RootField(field: StructField, derivedFromAtt: Boolean,
     contentAccessed: Boolean = true)
 }

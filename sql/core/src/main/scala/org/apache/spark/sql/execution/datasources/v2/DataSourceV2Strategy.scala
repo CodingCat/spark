@@ -19,15 +19,17 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.{sources, Strategy}
-import org.apache.spark.sql.catalyst.expressions.{And, AttributeReference, AttributeSet, Expression}
-import org.apache.spark.sql.catalyst.planning.PhysicalOperation
+import org.apache.spark.sql.{Strategy, sources}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, ExprId, Expression, IsNotNull, IsNull, NamedExpression}
+import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, SelectedField}
 import org.apache.spark.sql.catalyst.plans.logical.{AppendData, LogicalPlan, Repartition}
 import org.apache.spark.sql.execution.{FilterExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.DataSourceStrategy
+import org.apache.spark.sql.execution.datasources.parquet.ParquetSchemaPruning.RootField
 import org.apache.spark.sql.execution.streaming.continuous.{ContinuousCoalesceExec, WriteToContinuousDataSource, WriteToContinuousDataSourceExec}
 import org.apache.spark.sql.sources.v2.reader.{DataSourceReader, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
 import org.apache.spark.sql.sources.v2.reader.streaming.ContinuousReader
+import org.apache.spark.sql.types.{StructField, StructType}
 
 object DataSourceV2Strategy extends Strategy {
 
@@ -69,6 +71,51 @@ object DataSourceV2Strategy extends Strategy {
   }
 
   /**
+   * Gets the root (aka top-level, no-parent) [[StructField]]s for the given [[Expression]].
+   * When expr is an [[Attribute]], construct a field around it and indicate that that
+   * field was derived from an attribute.
+   */
+  private def getRootFields(expr: Expression): Seq[RootField] = {
+    // scalastyle:off
+    expr match {
+      case att: Attribute =>
+        RootField(StructField(att.name, att.dataType, att.nullable), derivedFromAtt = true) :: Nil
+      case SelectedField(field) =>
+        RootField(field, derivedFromAtt = false) :: Nil
+      // Root field accesses by `IsNotNull` and `IsNull` are special cases as the expressions
+      // don't actually use any nested fields. These root field accesses might be excluded later
+      // if there are any nested fields accesses in the query plan.
+      case IsNotNull(SelectedField(field)) =>
+        RootField(field, derivedFromAtt = false, contentAccessed = false) :: Nil
+      case IsNull(SelectedField(field)) =>
+        RootField(field, derivedFromAtt = false, contentAccessed = false) :: Nil
+      case IsNotNull(_: Attribute) | IsNull(_: Attribute) =>
+        expr.children.flatMap(getRootFields).map(_.copy(contentAccessed = false))
+      case _ =>
+        expr.children.flatMap(getRootFields)
+    }
+  }
+
+  /**
+   * Returns the set of fields from the Parquet file that the query plan needs.
+   */
+  private def identifyRootFields(expressions: Seq[Expression]) = {
+
+    val rootFields = expressions.flatMap(field => getRootFields(field))
+
+    // Kind of expressions don't need to access any fields of a root fields, e.g., `IsNotNull`.
+    // For them, if there are any nested fields accessed in the query, we don't need to add root
+    // field access of above expressions.
+    // For example, for a query `SELECT name.first FROM contacts WHERE name IS NOT NULL`,
+    // we don't need to read nested fields of `name` struct other than `first` field.
+    val (necessaryRootFields, optRootFields) = rootFields.distinct.partition(_.contentAccessed)
+
+    optRootFields.filter { opt =>
+      !necessaryRootFields.exists(_.field.name == opt.field.name)
+    } ++ necessaryRootFields
+  }
+
+  /**
    * Applies column pruning to the data source, w.r.t. the references of the given expressions.
    *
    * @return new output attributes after column pruning.
@@ -81,6 +128,13 @@ object DataSourceV2Strategy extends Strategy {
     reader match {
       case r: SupportsPushDownRequiredColumns =>
         val requiredColumns = AttributeSet(exprs.flatMap(_.references))
+        val requestedRootFields = identifyRootFields(exprs)
+        if (requestedRootFields.exists { case RootField(_, derivedFromAtt, _) =>
+          !derivedFromAtt }) {
+          val mergedSchema = requestedRootFields
+            .map { case RootField(field, _, _) => StructType(Array(field)) }
+            .reduceLeft(_ merge _)
+        }
         val neededOutput = relation.output.filter(requiredColumns.contains)
         if (neededOutput != relation.output) {
           r.pruneColumns(neededOutput.toStructType)
@@ -97,6 +151,25 @@ object DataSourceV2Strategy extends Strategy {
     }
   }
 
+  /**
+   * Normalizes the names of the attribute references in the given projects and filters to reflect
+   * the names in the given logical relation. This makes it possible to compare attributes and
+   * fields by name. Returns a tuple with the normalized projects and filters, respectively.
+   */
+  private def normalizeAttributeRefNames(
+      normalizedAttNameMap: Map[ExprId, String],
+      projects: Seq[NamedExpression],
+      filters: Seq[Expression]): (Seq[NamedExpression], Seq[Expression]) = {
+    val normalizedProjects = projects.map(_.transform {
+      case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
+        att.withName(normalizedAttNameMap(att.exprId))
+    }).map { case expr: NamedExpression => expr }
+    val normalizedFilters = filters.map(_.transform {
+      case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
+        att.withName(normalizedAttNameMap(att.exprId))
+    })
+    (normalizedProjects, normalizedFilters)
+  }
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case PhysicalOperation(project, filters, relation: DataSourceV2Relation) =>
