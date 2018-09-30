@@ -212,7 +212,7 @@ object DataSourceV2Strategy extends Strategy {
       // `postScanFilters` need to be evaluated after the scan.
       // `postScanFilters` and `pushedFilters` can overlap, e.g. the parquet row group filter.
       val (pushedFilters, postScanFilters) = pushFilters(reader, filters)
-      val output = pruneColumns(reader, relation, project ++ pushedFilters)
+      val output = pruneColumns(reader, relation, project ++ postScanFilters)
       logInfo(
         s"""
            |Pushing operators to ${relation.source.getClass}
