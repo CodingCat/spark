@@ -151,21 +151,23 @@ object DataSourceV2Strategy extends Strategy {
             .reduceLeft(_ merge _)
           if (relation.userSpecifiedSchema.isEmpty ||
             (countLeaves(relation.schema) > countLeaves(prunedSchema))) {
-            println("prunedSchema:")
+            println("prunedSchema1:")
             prunedSchema.printTreeString()
-          }
-          val projectionOverSchema = ProjectionOverSchema(prunedSchema)
-          val requestedColumns = exprs.map(_.transformDown {
-            case projectionOverSchema(expr) => expr
-          })
-          val referredAtts = requestedColumns.flatMap(_.references)
-          val neededOutput = relation.output.filter(referredAtts.contains)
-          if (neededOutput != relation.output) {
-            r.pruneColumns(neededOutput.toStructType)
-            val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
-            r.readSchema().toAttributes.map {
-              // We have to keep the attribute id during transformation.
-              a => a.withExprId(nameToAttr(a.name).exprId)
+            val projectionOverSchema = ProjectionOverSchema(prunedSchema)
+            val requestedColumns = exprs.map(_.transformDown {
+              case projectionOverSchema(expr) => expr
+            })
+            val referredAtts = requestedColumns.flatMap(_.references)
+            val neededOutput = relation.output.filter(referredAtts.contains)
+            if (neededOutput != relation.output) {
+              r.pruneColumns(neededOutput.toStructType)
+              val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
+              r.readSchema().toAttributes.map {
+                // We have to keep the attribute id during transformation.
+                a => a.withExprId(nameToAttr(a.name).exprId)
+              }
+            } else {
+              relation.output
             }
           } else {
             relation.output

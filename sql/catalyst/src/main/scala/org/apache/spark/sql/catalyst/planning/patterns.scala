@@ -76,7 +76,6 @@ object PhysicalOperation extends PredicateHelper {
       case Project(fields, child) if fields.forall(deterministicExcludingRand) =>
         val (_, filters, other, aliases) = collectProjectsAndFilters(child)
         val substitutedFields = fields.map(substitute(aliases)).asInstanceOf[Seq[NamedExpression]]
-        println(s"substitutedFields: ${substitutedFields.map(_.name).mkString(",")}")
         (Some(substitutedFields), filters, other, collectAliases(substitutedFields))
 
       case Filter(condition, child) if condition.deterministic =>
