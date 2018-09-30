@@ -148,26 +148,25 @@ object DataSourceV2Strategy extends Strategy {
         val requestedRootFields = identifyRootFields(exprs)
         if (requestedRootFields.exists { case RootField(_, derivedFromAtt, _) =>
           !derivedFromAtt }) {
-          val prunedSchema = requestedRootFields
+          val mergedSchema = requestedRootFields
             .map { case RootField(field, _, _) => StructType(Array(field)) }
             .reduceLeft(_ merge _)
           if (relation.userSpecifiedSchema.isEmpty ||
-            (countLeaves(relation.schema) > countLeaves(prunedSchema))) {
-            println("prunedSchema1:")
-            prunedSchema.printTreeString()
-            val projectionOverSchema = ProjectionOverSchema(prunedSchema)
+            (countLeaves(relation.schema) > countLeaves(mergedSchema))) {
+            mergedSchema.printTreeString()
+            val projectionOverSchema = ProjectionOverSchema(mergedSchema)
             val requestedColumns = exprs.map(_.transformDown {
               case projectionOverSchema(expr) => expr
             })
-            println(s"requestedColumns:\n" + requestedColumns.map(_.treeString).mkString("\n"))
             val referredAtts = AttributeSet(requestedColumns.flatMap(_.references).distinct)
-            println(s"referredAtt: $referredAtts")
-            println(s"relation output: ${relation.output.mkString(",")}")
             val neededOutput = relation.output.filter(referredAtts.contains)
-            println(s"neededOutput: ${neededOutput.mkString(",")}")
-            println(s"passed in schema: ${neededOutput.toStructType.printTreeString()}")
             if (neededOutput != relation.output) {
-              r.pruneColumns(neededOutput.toStructType)
+              val dataSourceSchemaFields = relation.schema.fieldNames.toSet
+              val prunedSchema = StructType(mergedSchema.filter(f =>
+                dataSourceSchemaFields.contains(f.name)))
+              r.pruneColumns(prunedSchema)
+              println(s"passed in schema: ")
+              prunedSchema.printTreeString()
               val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
               r.readSchema().toAttributes.map {
                 // We have to keep the attribute id during transformation.
