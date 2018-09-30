@@ -66,7 +66,15 @@ object DataSourceV2Strategy extends Strategy {
           .map(translatedFilterToExpr)
         // The filters which are marked as pushed to this data source
         val pushedFilters = r.pushedFilters().map(translatedFilterToExpr)
-        (pushedFilters, untranslatableExprs ++ postScanFilters)
+        val colNamesInSchema = reader.readSchema().map(_.name).toSet
+        // scalastyle:off
+        println("untranslatableExprs:")
+        untranslatableExprs.foreach(exp => println(exp.treeString))
+        val validFilter = (untranslatableExprs ++ postScanFilters).filter { filter =>
+          val allAtts = filter.references.toSeq
+          allAtts.forall(att => colNamesInSchema.contains(att.name))
+        }
+        (pushedFilters, validFilter)
 
       case _ => (Nil, filters)
     }
