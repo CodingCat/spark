@@ -157,6 +157,7 @@ object DataSourceV2Strategy extends Strategy {
             val requestedColumns = exprs.map(_.transformDown {
               case projectionOverSchema(expr) => expr
             })
+            println(s"requestedColumns:\n" + requestedColumns.map(_.treeString).mkString("\n"))
             val referredAtts = requestedColumns.flatMap(_.references)
             println(s"referredAtt: ${referredAtts.map(_.name).mkString(",")}")
             println(s"relation output: ${relation.output.mkString(",")}")
@@ -208,7 +209,7 @@ object DataSourceV2Strategy extends Strategy {
       // `postScanFilters` need to be evaluated after the scan.
       // `postScanFilters` and `pushedFilters` can overlap, e.g. the parquet row group filter.
       val (pushedFilters, postScanFilters) = pushFilters(reader, filters)
-      val output = pruneColumns(reader, relation, project ++ postScanFilters)
+      val output = pruneColumns(reader, relation, project ++ pushedFilters)
       logInfo(
         s"""
            |Pushing operators to ${relation.source.getClass}
