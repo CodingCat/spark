@@ -176,7 +176,10 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
   private def identifyRootFields(projects: Seq[NamedExpression], filters: Seq[Expression]) = {
     val projectionRootFields = projects.flatMap(field => getRootFields(field,
       field.name.contains("occur")))
-    val filterRootFields = filters.flatMap(getRootFields(_))
+    val filterRootFields = filters.flatMap(field => getRootFields(field, false))
+
+    println(s"projects count: ${projectionRootFields.length}," +
+      s" filter length: ${filterRootFields.length}")
 
     // Kind of expressions don't need to access any fields of a root fields, e.g., `IsNotNull`.
     // For them, if there are any nested fields accessed in the query, we don't need to add root
