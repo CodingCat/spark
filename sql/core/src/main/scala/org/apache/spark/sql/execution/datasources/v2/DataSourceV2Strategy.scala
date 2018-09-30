@@ -70,6 +70,7 @@ object DataSourceV2Strategy extends Strategy {
         // scalastyle:off
         println("untranslatableExprs:")
         untranslatableExprs.foreach(exp => println(exp.treeString))
+        println("====")
         val validFilter = (untranslatableExprs ++ postScanFilters).filter { filter =>
           val allAtts = filter.references.toSeq
           allAtts.forall(att => colNamesInSchema.contains(att.name))
