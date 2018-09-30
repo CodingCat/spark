@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import scala.collection.mutable
 
+// scalastyle:off
 import org.apache.spark.sql.{Strategy, sources}
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, ExprId, Expression, IsNotNull, IsNull, NamedExpression}
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema, SelectedField}
@@ -30,6 +31,7 @@ import org.apache.spark.sql.execution.streaming.continuous.{ContinuousCoalesceEx
 import org.apache.spark.sql.sources.v2.reader.{DataSourceReader, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
 import org.apache.spark.sql.sources.v2.reader.streaming.ContinuousReader
 import org.apache.spark.sql.types._
+// scalastyle:on
 
 object DataSourceV2Strategy extends Strategy {
 
