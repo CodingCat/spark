@@ -131,7 +131,7 @@ abstract class RuleExecutor[TreeType <: TreeNode[_]] extends Logging {
       }
 
       if (!batchStartPlan.fastEquals(curPlan)) {
-        logDebug(
+        logInfo(
           s"""
             |=== Result of Batch ${batch.name} ===
             |${sideBySide(batchStartPlan.treeString, curPlan.treeString).mkString("\n")}
