@@ -19,13 +19,13 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.{Strategy, sources}
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, ExprId, Expression, IsNotNull, IsNull, NamedExpression}
+import org.apache.spark.sql.{sources, Strategy}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, Expression, ExprId, IsNotNull, IsNull, NamedExpression}
 import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema, SelectedField}
 import org.apache.spark.sql.catalyst.plans.logical.{AppendData, LogicalPlan, Repartition}
 import org.apache.spark.sql.execution.{FilterExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.DataSourceStrategy
-import org.apache.spark.sql.execution.datasources.parquet.ParquetSchemaPruning.{RootField, countLeaves}
+import org.apache.spark.sql.execution.datasources.parquet.ParquetSchemaPruning.RootField
 import org.apache.spark.sql.execution.streaming.continuous.{ContinuousCoalesceExec, WriteToContinuousDataSource, WriteToContinuousDataSourceExec}
 import org.apache.spark.sql.sources.v2.reader.{DataSourceReader, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
 import org.apache.spark.sql.sources.v2.reader.streaming.ContinuousReader
