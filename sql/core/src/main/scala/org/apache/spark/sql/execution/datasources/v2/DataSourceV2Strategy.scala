@@ -165,7 +165,7 @@ object DataSourceV2Strategy extends Strategy {
             println(s"relation output: ${relation.output.mkString(",")}")
             val neededOutput = relation.output.filter(referredAtts.contains)
             println(s"neededOutput: ${neededOutput.mkString(",")}")
-            println(s"passed in schema: ${neededOutput.toStructType}")
+            println(s"passed in schema: ${neededOutput.toStructType.printTreeString()}")
             if (neededOutput != relation.output) {
               r.pruneColumns(neededOutput.toStructType)
               val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
