@@ -39,18 +39,10 @@ object PhysicalOperation extends PredicateHelper {
     Some((fields.getOrElse(child.output), filters, child))
   }
 
-  private def printChild(exp: Expression): Unit = {
-    // scalastyle:off
-    println("+++++++++")
-    println(exp.nodeName)
-    exp.children.foreach(printChild)
-  }
-
   private def deterministicExcludingRand(field: Expression): Boolean = {
     if (field.children.forall(_.deterministic)) {
       true
     } else {
-      printChild(field)
       field.children.filterNot(c => c.nodeName == "Rand" || c.nodeName == "Randn").
         forall(deterministicExcludingRand)
     }

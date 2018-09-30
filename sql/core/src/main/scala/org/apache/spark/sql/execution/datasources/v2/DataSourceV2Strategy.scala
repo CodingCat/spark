@@ -76,7 +76,6 @@ object DataSourceV2Strategy extends Strategy {
    * field was derived from an attribute.
    */
   private def getRootFields(expr: Expression): Seq[RootField] = {
-    // scalastyle:off
     expr match {
       case att: Attribute =>
         RootField(StructField(att.name, att.dataType, att.nullable), derivedFromAtt = true) :: Nil
@@ -140,6 +139,7 @@ object DataSourceV2Strategy extends Strategy {
       reader: DataSourceReader,
       relation: DataSourceV2Relation,
       exprs: Seq[Expression]): Seq[AttributeReference] = {
+    // scalastyle:off
     reader match {
       case r: SupportsPushDownRequiredColumns =>
         // val requiredColumns = AttributeSet(exprs.flatMap(_.references))
@@ -158,8 +158,8 @@ object DataSourceV2Strategy extends Strategy {
               case projectionOverSchema(expr) => expr
             })
             println(s"requestedColumns:\n" + requestedColumns.map(_.treeString).mkString("\n"))
-            val referredAtts = requestedColumns.flatMap(_.references)
-            println(s"referredAtt: ${referredAtts.map(_.name).mkString(",")}")
+            val referredAtts = requestedColumns.flatMap(_.references).distinct
+            println(s"referredAtt: ${referredAtts.mkString(",")}")
             println(s"relation output: ${relation.output.mkString(",")}")
             val neededOutput = relation.output.filter(referredAtts.contains)
             if (neededOutput != relation.output) {
