@@ -19,17 +19,17 @@ package org.apache.spark.sql.execution.datasources.v2
 
 import scala.collection.mutable
 
-import org.apache.spark.sql.{sources, Strategy}
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, Expression, ExprId, IsNotNull, IsNull, NamedExpression}
-import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, SelectedField}
+import org.apache.spark.sql.{Strategy, sources}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, AttributeSet, ExprId, Expression, IsNotNull, IsNull, NamedExpression}
+import org.apache.spark.sql.catalyst.planning.{PhysicalOperation, ProjectionOverSchema, SelectedField}
 import org.apache.spark.sql.catalyst.plans.logical.{AppendData, LogicalPlan, Repartition}
 import org.apache.spark.sql.execution.{FilterExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.DataSourceStrategy
-import org.apache.spark.sql.execution.datasources.parquet.ParquetSchemaPruning.RootField
+import org.apache.spark.sql.execution.datasources.parquet.ParquetSchemaPruning.{RootField, countLeaves}
 import org.apache.spark.sql.execution.streaming.continuous.{ContinuousCoalesceExec, WriteToContinuousDataSource, WriteToContinuousDataSourceExec}
 import org.apache.spark.sql.sources.v2.reader.{DataSourceReader, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
 import org.apache.spark.sql.sources.v2.reader.streaming.ContinuousReader
-import org.apache.spark.sql.types.{StructField, StructType}
+import org.apache.spark.sql.types._
 
 object DataSourceV2Strategy extends Strategy {
 
@@ -116,6 +116,21 @@ object DataSourceV2Strategy extends Strategy {
   }
 
   /**
+   * Counts the "leaf" fields of the given dataType. Informally, this is the
+   * number of fields of non-complex data type in the tree representation of
+   * [[DataType]].
+   */
+  private def countLeaves(dataType: DataType): Int = {
+    dataType match {
+      case array: ArrayType => countLeaves(array.elementType)
+      case map: MapType => countLeaves(map.keyType) + countLeaves(map.valueType)
+      case struct: StructType =>
+        struct.map(field => countLeaves(field.dataType)).sum
+      case _ => 1
+    }
+  }
+
+  /**
    * Applies column pruning to the data source, w.r.t. the references of the given expressions.
    *
    * @return new output attributes after column pruning.
@@ -127,26 +142,37 @@ object DataSourceV2Strategy extends Strategy {
       exprs: Seq[Expression]): Seq[AttributeReference] = {
     reader match {
       case r: SupportsPushDownRequiredColumns =>
-        val requiredColumns = AttributeSet(exprs.flatMap(_.references))
+        // val requiredColumns = AttributeSet(exprs.flatMap(_.references))
         val requestedRootFields = identifyRootFields(exprs)
         if (requestedRootFields.exists { case RootField(_, derivedFromAtt, _) =>
           !derivedFromAtt }) {
-          val mergedSchema = requestedRootFields
+          val prunedSchema = requestedRootFields
             .map { case RootField(field, _, _) => StructType(Array(field)) }
             .reduceLeft(_ merge _)
-        }
-        val neededOutput = relation.output.filter(requiredColumns.contains)
-        if (neededOutput != relation.output) {
-          r.pruneColumns(neededOutput.toStructType)
-          val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
-          r.readSchema().toAttributes.map {
-            // We have to keep the attribute id during transformation.
-            a => a.withExprId(nameToAttr(a.name).exprId)
+          if (relation.userSpecifiedSchema.isEmpty ||
+            (countLeaves(relation.schema) > countLeaves(prunedSchema))) {
+            println("prunedSchema:")
+            prunedSchema.printTreeString()
+          }
+          val projectionOverSchema = ProjectionOverSchema(prunedSchema)
+          val requestedColumns = exprs.map(_.transformDown {
+            case projectionOverSchema(expr) => expr
+          })
+          val referredAtts = requestedColumns.flatMap(_.references)
+          val neededOutput = relation.output.filter(referredAtts.contains)
+          if (neededOutput != relation.output) {
+            r.pruneColumns(neededOutput.toStructType)
+            val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
+            r.readSchema().toAttributes.map {
+              // We have to keep the attribute id during transformation.
+              a => a.withExprId(nameToAttr(a.name).exprId)
+            }
+          } else {
+            relation.output
           }
         } else {
           relation.output
         }
-
       case _ => relation.output
     }
   }

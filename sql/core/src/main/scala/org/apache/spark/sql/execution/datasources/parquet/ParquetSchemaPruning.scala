@@ -76,6 +76,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
         } else {
           op
         }
+      /*
     case op @ PhysicalOperation(projects, filters, dsv2 @ DataSourceV2Relation(_, _, _, _, _)) =>
       val (normalizedProjects, normalizedFilters) =
         normalizeAttributeRefNames(dsv2.output.map(att => (att.exprId, att.name)).toMap,
@@ -132,19 +133,12 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
             case projectionOverSchema(expr) => expr
           }).map { case expr: NamedExpression => expr }
 
-          newProjects.map(_.toAttribute)
-
           logInfo(s"New projects:\n${newProjects.map(_.treeString).mkString("\n")}")
           logDebug(s"Pruned data schema:\n${prunedSchema.treeString}")
 
           Project(newProjects, projectionChild)
-        } else {
-          op
+          */
         }
-      } else {
-        op
-      }
-    }
 
   /**
    * Checks to see if the given relation is Parquet and can be pruned.
