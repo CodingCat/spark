@@ -158,6 +158,8 @@ object DataSourceV2Strategy extends Strategy {
               case projectionOverSchema(expr) => expr
             })
             val referredAtts = requestedColumns.flatMap(_.references)
+            println(s"referredAtt: ${referredAtts.map(_.name).mkString(",")}")
+            println(s"relation output: ${relation.output.mkString(",")}")
             val neededOutput = relation.output.filter(referredAtts.contains)
             if (neededOutput != relation.output) {
               r.pruneColumns(neededOutput.toStructType)
