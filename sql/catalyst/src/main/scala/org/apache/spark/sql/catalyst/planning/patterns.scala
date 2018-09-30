@@ -73,7 +73,7 @@ object PhysicalOperation extends PredicateHelper {
   private def collectProjectsAndFilters(plan: LogicalPlan):
       (Option[Seq[NamedExpression]], Seq[Expression], LogicalPlan, Map[Attribute, Expression]) =
     plan match {
-      case Project(fields, child) if fields.forall(deterministicExcludingRand) =>
+      case Project(fields, child) if fields.forall(_.deterministic) =>
         val (_, filters, other, aliases) = collectProjectsAndFilters(child)
         val substitutedFields = fields.map(substitute(aliases)).asInstanceOf[Seq[NamedExpression]]
         println(s"substitutedFields: ${substitutedFields.map(_.name).mkString(",")}")
