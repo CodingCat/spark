@@ -157,8 +157,11 @@ object DataSourceV2Strategy extends Strategy {
     // scalastyle:off
     reader match {
       case r: SupportsPushDownRequiredColumns =>
-        // val requiredColumns = AttributeSet(exprs.flatMap(_.references))
-        val requestedRootFields = identifyRootFields(exprs)
+        val normalizedExps = normalizeAttributeRefNames(
+          relation.output.map(att => (att.exprId, att.name)).toMap, exprs)
+        val requestedRootFields = identifyRootFields(normalizedExps)
+        println("requested root fields:")
+        requestedRootFields.foreach(println)
         if (requestedRootFields.exists { case RootField(_, derivedFromAtt, _) =>
           !derivedFromAtt }) {
           val mergedSchema = requestedRootFields
@@ -205,17 +208,11 @@ object DataSourceV2Strategy extends Strategy {
    */
   private def normalizeAttributeRefNames(
       normalizedAttNameMap: Map[ExprId, String],
-      projects: Seq[NamedExpression],
-      filters: Seq[Expression]): (Seq[NamedExpression], Seq[Expression]) = {
-    val normalizedProjects = projects.map(_.transform {
-      case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
-        att.withName(normalizedAttNameMap(att.exprId))
-    }).map { case expr: NamedExpression => expr }
-    val normalizedFilters = filters.map(_.transform {
+      exps: Seq[Expression]): Seq[Expression] = {
+    exps.map(_.transform {
       case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
         att.withName(normalizedAttNameMap(att.exprId))
     })
-    (normalizedProjects, normalizedFilters)
   }
 
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
