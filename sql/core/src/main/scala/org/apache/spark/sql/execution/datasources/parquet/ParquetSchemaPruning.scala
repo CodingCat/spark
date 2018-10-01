@@ -105,11 +105,8 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
             .userSpecifiedSchema
             .get
             .toAttributes
-            .map {
-              case att if outputIdMap.contains(att.name) =>
-                att.withExprId(outputIdMap(att.name))
-              case att => att
-            }
+            .filter(att => outputIdMap.contains(att.name))
+            .map (att => att.withExprId(outputIdMap(att.name)))
           val prunedDSV2Relation = prunedDSV2Relation1.copy(output = prunedRelationOutput)
           val projectionOverSchema = ProjectionOverSchema(prunedSchema)
 
