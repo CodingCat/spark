@@ -73,7 +73,11 @@ object DataSourceV2Strategy extends Strategy {
         println("====")
         val validFilter = (untranslatableExprs ++ postScanFilters).filter { filter =>
           val allAtts = filter.references.toSeq
-          allAtts.forall(att => colNamesInSchema.contains(att.name))
+          val r = allAtts.forall(att => colNamesInSchema.contains(att.name))
+          if (r) {
+            println(s"${filter.treeString} is removed")
+          }
+          r
         }
         (pushedFilters, validFilter)
 
