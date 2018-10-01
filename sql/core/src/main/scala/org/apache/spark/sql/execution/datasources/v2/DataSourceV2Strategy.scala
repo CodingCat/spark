@@ -154,6 +154,24 @@ object DataSourceV2Strategy extends Strategy {
       reader: DataSourceReader,
       relation: DataSourceV2Relation,
       exprs: Seq[Expression]): Seq[AttributeReference] = {
+    reader match {
+      case r: SupportsPushDownRequiredColumns =>
+        val requiredColumns = AttributeSet(exprs.flatMap(_.references))
+        val neededOutput = relation.output.filter(requiredColumns.contains)
+        if (neededOutput != relation.output) {
+          r.pruneColumns(neededOutput.toStructType)
+          val nameToAttr = relation.output.map(_.name).zip(relation.output).toMap
+          r.readSchema().toAttributes.map {
+            // We have to keep the attribute id during transformation.
+            a => a.withExprId(nameToAttr(a.name).exprId)
+          }
+        } else {
+          relation.output
+        }
+
+      case _ => relation.output
+    }
+    /*
     // scalastyle:off
     reader match {
       case r: SupportsPushDownRequiredColumns =>
@@ -198,7 +216,7 @@ object DataSourceV2Strategy extends Strategy {
           relation.output
         }
       case _ => relation.output
-    }
+    }*/
   }
 
   /**
@@ -218,8 +236,6 @@ object DataSourceV2Strategy extends Strategy {
   override def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case PhysicalOperation(project, filters, relation: DataSourceV2Relation) =>
       val reader = relation.newReader()
-      println("filters:")
-      filters.foreach(exp => println(exp.treeString))
       // `pushedFilters` will be pushed down and evaluated in the underlying data sources.
       // `postScanFilters` need to be evaluated after the scan.
       // `postScanFilters` and `pushedFilters` can overlap, e.g. the parquet row group filter.
