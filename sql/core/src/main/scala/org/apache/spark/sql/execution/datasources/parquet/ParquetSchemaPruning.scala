@@ -107,6 +107,7 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
             .toAttributes
             .filter(att => outputIdMap.contains(att.name))
             .map (att => att.withExprId(outputIdMap(att.name)))
+          println(s"prunedRelationOutput: ${prunedRelationOutput.map(_.name)}")
           val prunedDSV2Relation = prunedDSV2Relation1.copy(output = prunedRelationOutput)
           val projectionOverSchema = ProjectionOverSchema(prunedSchema)
 
@@ -160,8 +161,9 @@ private[sql] object ParquetSchemaPruning extends Rule[LogicalPlan] {
       case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
         att.withName(normalizedAttNameMap(att.exprId))
     }).map { case expr: NamedExpression => expr }
-    val normalizedFilters = filters.map(_.transform {
-      case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
+    val normalizedFilters = filters.filter(filter =>
+      filter.references.forall(att => normalizedAttNameMap.contains(att.exprId))).map(
+      _.transform { case att: AttributeReference if normalizedAttNameMap.contains(att.exprId) =>
         att.withName(normalizedAttNameMap(att.exprId))
     })
     (normalizedProjects, normalizedFilters)
