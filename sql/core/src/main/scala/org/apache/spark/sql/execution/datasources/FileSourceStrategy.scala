@@ -190,6 +190,7 @@ object FileSourceStrategy extends Strategy with Logging {
       val requiredAttributes = AttributeSet(requiredExpressions)
 
       // scalastyle:off
+      println(requiredExpressions.map(_.qualifiedName).mkString(","))
       println(requiredAttributes.toSeq.mkString(","))
       // scalastyle:on
 
