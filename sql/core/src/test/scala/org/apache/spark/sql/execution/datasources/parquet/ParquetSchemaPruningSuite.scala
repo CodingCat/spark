@@ -196,6 +196,7 @@ class ParquetSchemaPruningSuite
     val query = sql("select * from contacts")
       .coalesce(1)
       .select("name.middle")
+    query.explain()
     checkScan(query, "struct<name:struct<middle:string>>")
     query.printSchema()
     checkAnswer(query.orderBy("id"), Row("X.") :: Row("Y.") :: Row(null) :: Row(null) :: Nil)
