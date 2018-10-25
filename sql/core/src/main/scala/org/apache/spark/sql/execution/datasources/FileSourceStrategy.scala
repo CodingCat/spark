@@ -189,14 +189,6 @@ object FileSourceStrategy extends Strategy with Logging {
       val requiredExpressions: Seq[NamedExpression] = filterAttributes.toSeq ++ projects
       val requiredAttributes = AttributeSet(requiredExpressions)
 
-      // scalastyle:off
-      println(requiredExpressions.flatMap(exp => exp.references.toSeq.zip(Array.fill(
-        exp.references.size)(exp.qualifiedName))).foreach{case (attr, exp) =>
-        println(s"$exp refers to $attr")})
-      println(requiredExpressions.map(_.qualifiedName).mkString(","))
-      println(requiredAttributes.toSeq.mkString(","))
-      // scalastyle:on
-
       val readDataColumns =
         dataColumns
           .filter(requiredAttributes.contains)

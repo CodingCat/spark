@@ -192,6 +192,15 @@ class ParquetSchemaPruningSuite
     checkAnswer(query, Row(Row("abc", "123 Business Street")) :: Row(null) :: Nil)
   }
 
+  testSchemaPruning("coalesce and then select a single complex field") {
+    val query = sql("select * from contacts")
+      .coalesce(1)
+      .select("name.middle")
+    checkScan(query, "struct<name:struct<middle:string>>")
+    query.printSchema()
+    checkAnswer(query.orderBy("id"), Row("X.") :: Row("Y.") :: Row(null) :: Row(null) :: Nil)
+  }
+
   testSchemaPruning("select a single complex field and is null expression in project") {
     val query = sql("select name.first, address is not null from contacts")
     checkScan(query, "struct<name:struct<first:string>,address:string>")
