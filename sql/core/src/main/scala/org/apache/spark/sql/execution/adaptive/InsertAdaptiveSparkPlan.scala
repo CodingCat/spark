@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.adaptive
 
 import scala.collection.mutable
 
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.catalyst.expressions
 import org.apache.spark.sql.catalyst.expressions.{DynamicPruningSubquery, ListQuery, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -41,7 +42,10 @@ case class InsertAdaptiveSparkPlan(
 
   private val conf = adaptiveExecutionContext.session.sessionState.conf
 
-  override def apply(plan: SparkPlan): SparkPlan = applyInternal(plan, false)
+  override def apply(plan: SparkPlan): SparkPlan = {
+    // find if any logical plan is attached with Dataset.AQE_TAG
+    applyInternal(plan, false)
+  }
 
   private def applyInternal(plan: SparkPlan, isSubquery: Boolean): SparkPlan = plan match {
     case _ if !conf.adaptiveExecutionEnabled

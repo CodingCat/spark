@@ -71,6 +71,7 @@ private[sql] object Dataset {
   val DATASET_ID_KEY = "__dataset_id"
   val COL_POS_KEY = "__col_position"
   val DATASET_ID_TAG = TreeNodeTag[Long]("dataset_id")
+  val AQE_TAG = TreeNodeTag[Boolean]("aqe_enabled_locally")
 
   def apply[T: Encoder](sparkSession: SparkSession, logicalPlan: LogicalPlan): Dataset[T] = {
     val dataset = new Dataset(sparkSession, logicalPlan, implicitly[Encoder[T]])
@@ -193,6 +194,11 @@ class Dataset[T] private[sql](
     @DeveloperApi @Unstable @transient val encoder: Encoder[T])
   extends Serializable {
 
+  def findTag(plan: SparkPlan): Boolean = {
+    plan.logicalLink.map(_.getTagValue(Dataset.AQE_TAG)).getOrElse(Some(false)).get ||
+      plan.children.exists(findTag)
+  }
+  
   @transient lazy val sparkSession: SparkSession = {
     if (queryExecution == null || queryExecution.sparkSession == null) {
       throw new SparkException(
@@ -3483,8 +3489,8 @@ class Dataset[T] private[sql](
   }
 
   def enableAdaptiveExecution: Unit = {
+    logicalPlan.setTagValue(Dataset.AQE_TAG, true)
     queryExecution.enableAQELocally
-
   }
 
   ////////////////////////////////////////////////////////////////////////////
