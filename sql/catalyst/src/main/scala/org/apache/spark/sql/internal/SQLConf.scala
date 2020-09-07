@@ -426,6 +426,14 @@ object SQLConf {
       .version("3.0.0")
       .fallbackConf(SHUFFLE_TARGET_POSTSHUFFLE_INPUT_SIZE)
 
+  val FORCE_COALESCE_PARTITIONS_ENABLED =
+    buildConf("spark.sql.adaptive.coalescePartitions.forceRun")
+      .doc(s"When true and '${ADAPTIVE_EXECUTION_ENABLED.key}' is true, Spark will coalesce " +
+        "contiguous shuffle partitions according to the target size regardlessly")
+      .version("3.0.0")
+      .booleanConf
+      .createWithDefault(false)
+
   val COALESCE_PARTITIONS_ENABLED =
     buildConf("spark.sql.adaptive.coalescePartitions.enabled")
       .doc(s"When true and '${ADAPTIVE_EXECUTION_ENABLED.key}' is true, Spark will coalesce " +
@@ -2963,6 +2971,8 @@ class SQLConf extends Serializable with Logging {
     getConf(NON_EMPTY_PARTITION_RATIO_FOR_BROADCAST_JOIN)
 
   def coalesceShufflePartitionsEnabled: Boolean = getConf(COALESCE_PARTITIONS_ENABLED)
+
+  def forceCoalesceShufflePartitions: Boolean = getConf(FORCE_COALESCE_PARTITIONS_ENABLED)
 
   def minBatchesToRetain: Int = getConf(MIN_BATCHES_TO_RETAIN)
 

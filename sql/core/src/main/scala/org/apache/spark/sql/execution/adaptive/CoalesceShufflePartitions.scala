@@ -49,7 +49,8 @@ case class CoalesceShufflePartitions(session: SparkSession) extends Rule[SparkPl
     val shuffleStages = collectShuffleStages(plan)
     // ShuffleExchanges introduced by repartition do not support changing the number of partitions.
     // We change the number of partitions in the stage only if all the ShuffleExchanges support it.
-    if (!shuffleStages.forall(_.shuffle.canChangeNumPartitions)) {
+    if (!conf.forceCoalesceShufflePartitions &&
+      !shuffleStages.forall(_.shuffle.canChangeNumPartitions)) {
       plan
     } else {
       // `ShuffleQueryStageExec#mapStats` returns None when the input RDD has 0 partitions,
