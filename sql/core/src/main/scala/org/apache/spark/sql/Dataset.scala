@@ -198,7 +198,7 @@ class Dataset[T] private[sql](
     plan.logicalLink.map(_.getTagValue(Dataset.AQE_TAG)).getOrElse(Some(false)).get ||
       plan.children.exists(findTag)
   }
-  
+
   @transient lazy val sparkSession: SparkSession = {
     if (queryExecution == null || queryExecution.sparkSession == null) {
       throw new SparkException(
