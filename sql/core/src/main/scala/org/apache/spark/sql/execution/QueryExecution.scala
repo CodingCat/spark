@@ -111,6 +111,8 @@ class QueryExecution(
     executePhase(QueryPlanningTracker.PLANNING) {
       // clone the plan to avoid sharing the plan instance between different stages like analyzing,
       // optimizing and planning.
+      // scalastyle:off
+      println(s"current df's ${enabledAdaptiveLocally}")
       QueryExecution.prepareForExecution(preparations, sparkPlan.clone())
     }
   }
