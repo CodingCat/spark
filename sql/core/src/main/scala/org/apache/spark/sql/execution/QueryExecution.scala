@@ -60,7 +60,13 @@ class QueryExecution(
   // scalastyle:off
   println(s"creating new query execution $id")
 
-  var enabledAdaptiveLocally = false
+  private var enabledAdaptiveLocally = false
+
+  def enableAQELocally: Unit = {
+    enabledAdaptiveLocally = true
+    // force evaluate execution plan
+    executedPlan
+  }
 
   // TODO: Move the planner an optimizer into here from SessionState.
   protected def planner = sparkSession.sessionState.planner

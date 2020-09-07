@@ -3484,6 +3484,7 @@ class Dataset[T] private[sql](
 
   def enableAdaptiveExecution: Unit = {
     queryExecution.enabledAdaptiveLocally = true
+
   }
 
   ////////////////////////////////////////////////////////////////////////////
