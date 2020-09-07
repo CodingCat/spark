@@ -55,6 +55,9 @@ class QueryExecution(
     val logical: LogicalPlan,
     val tracker: QueryPlanningTracker = new QueryPlanningTracker) extends Logging {
 
+  // scalastyle:off
+  println("creating new query execution")
+
   val id: Long = QueryExecution.nextExecutionId
 
   var enabledAdaptiveLocally = false
