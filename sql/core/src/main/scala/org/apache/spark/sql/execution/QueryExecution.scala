@@ -55,10 +55,10 @@ class QueryExecution(
     val logical: LogicalPlan,
     val tracker: QueryPlanningTracker = new QueryPlanningTracker) extends Logging {
 
-  // scalastyle:off
-  println("creating new query execution")
-
   val id: Long = QueryExecution.nextExecutionId
+
+  // scalastyle:off
+  println(s"creating new query execution $id")
 
   var enabledAdaptiveLocally = false
 
@@ -115,7 +115,7 @@ class QueryExecution(
       // clone the plan to avoid sharing the plan instance between different stages like analyzing,
       // optimizing and planning.
       // scalastyle:off
-      println(s"current df's ${enabledAdaptiveLocally}")
+      println(s"current df's ${enabledAdaptiveLocally} at ${id}")
       QueryExecution.prepareForExecution(preparations, sparkPlan.clone())
     }
   }
