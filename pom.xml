@@ -195,6 +195,7 @@
     <jpam.version>1.1</jpam.version>
     <selenium.version>3.141.59</selenium.version>
     <htmlunit.version>2.40.0</htmlunit.version>
+    <hudi.version>0.5.1.2</hudi.version>
     <!--
     Managed up from older version from Avro; sync with jackson-module-paranamer dependency version
     -->
@@ -260,6 +261,19 @@
   </properties>
   <repositories>
     <repository>
+      <id>uber-internal-releases</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/libs-release-local/</url>
+    </repository>
+
+    <repository>
+      <id>uber-external-releases</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/ext-release-local/</url>
+    </repository>
+    <repository>
+      <id>uber-internal-snapshots</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/libs-snapshot-local/</url>
+    </repository>
+    <repository>
       <id>gcs-maven-central-mirror</id>
       <!--
         Google Mirror of Maven Central, placed first so that it's used instead of flaky Maven Central.
@@ -317,6 +331,17 @@
     </pluginRepository>
   </pluginRepositories>
   <dependencies>
+    <dependency>
+      <groupId>org.apache.hudi</groupId>
+      <artifactId>hudi-hadoop-mr</artifactId>
+      <version>${hudi.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hive</groupId>
+          <artifactId>hive-jdbc</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <!--
       This is a dummy dependency that is used to trigger the maven-shade plugin so that Spark's
       published POMs are flattened and do not contain variables. Without this dependency, some
