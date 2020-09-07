@@ -60,7 +60,7 @@ class QueryExecution(
   // scalastyle:off
   println(s"creating new query execution $id")
 
-  private var enabledAdaptiveLocally = false
+  private[execution] var enabledAdaptiveLocally = false
 
   def enableAQELocally: Unit = {
     enabledAdaptiveLocally = true
