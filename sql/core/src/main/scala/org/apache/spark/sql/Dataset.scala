@@ -194,11 +194,6 @@ class Dataset[T] private[sql](
     @DeveloperApi @Unstable @transient val encoder: Encoder[T])
   extends Serializable {
 
-  def findTag(plan: SparkPlan): Boolean = {
-    plan.logicalLink.map(_.getTagValue(Dataset.AQE_TAG)).getOrElse(Some(false)).get ||
-      plan.children.exists(findTag)
-  }
-
   @transient lazy val sparkSession: SparkSession = {
     if (queryExecution == null || queryExecution.sparkSession == null) {
       throw new SparkException(

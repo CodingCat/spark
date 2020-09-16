@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
+import org.apache.spark.sql.{AnalysisException, Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.{InternalRow, QueryPlanningTracker}
 import org.apache.spark.sql.catalyst.analysis.UnsupportedOperationChecker
 import org.apache.spark.sql.catalyst.expressions.codegen.ByteCodeStats
@@ -56,6 +56,12 @@ class QueryExecution(
     val tracker: QueryPlanningTracker = new QueryPlanningTracker) extends Logging {
 
   val id: Long = QueryExecution.nextExecutionId
+
+  def findTag(plan: LogicalPlan): Boolean = {
+    val currentNodeTag = plan.getTagValue(Dataset.AQE_TAG).getOrElse(false)
+    val allChildren = plan.children.exists(plan => findTag(plan))
+    currentNodeTag || allChildren
+  }
 
   // scalastyle:off
   println(s"creating new query execution $id")
@@ -117,13 +123,16 @@ class QueryExecution(
     // We need to materialize the optimizedPlan here, before tracking the planning phase, to ensure
     // that the optimization time is not counted as part of the planning phase.
     assertOptimized()
-    executePhase(QueryPlanningTracker.PLANNING) {
+    val physicalPlan = executePhase(QueryPlanningTracker.PLANNING) {
       // clone the plan to avoid sharing the plan instance between different stages like analyzing,
       // optimizing and planning.
       // scalastyle:off
       println(s"current df's ${enabledAdaptiveLocally} at ${id}")
       QueryExecution.prepareForExecution(preparations, sparkPlan.clone())
     }
+    physicalPlan.setTagValue(Dataset.AQE_TAG,
+      logical.getTagValue(Dataset.AQE_TAG).getOrElse(false))
+    physicalPlan
   }
 
   /**
