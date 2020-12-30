@@ -19,6 +19,7 @@ package org.apache.spark.sql.catalyst.csv
 
 import java.io.Writer
 
+import com.univocity.parsers.common.NormalizedString
 import com.univocity.parsers.csv.CsvWriter
 
 import org.apache.spark.sql.catalyst.InternalRow
@@ -31,6 +32,8 @@ class UnivocityGenerator(
     writer: Writer,
     options: CSVOptions) {
   private val writerSettings = options.asWriterSettings
+  // scalastyle:off
+  println(s"field names are: ${schema.fieldNames.toList}")
   writerSettings.setHeaders(schema.fieldNames: _*)
   private val gen = new CsvWriter(writer, writerSettings)
 
@@ -84,6 +87,18 @@ class UnivocityGenerator(
   }
 
   def writeHeaders(): Unit = {
+    println("=======")
+    val headers = classOf[CsvWriter].getSuperclass.getDeclaredField("headers")
+    headers.setAccessible(true)
+    println(writerSettings.getHeaders.toList)
+    println(NormalizedString.toIdentifierGroupArray(writerSettings.getHeaders).toList)
+    val normalizedHeaders = headers.get(gen).asInstanceOf[Array[NormalizedString]]
+    println(normalizedHeaders.toList)
+    val normaledHeadersString = NormalizedString.toArray(normalizedHeaders: _*)
+    val normaliedGroupArray = NormalizedString.toIdentifierGroupArray(normaledHeadersString)
+    println(normaledHeadersString.toList)
+    println(normaliedGroupArray.toList)
+    println("=======")
     gen.writeHeaders()
   }
 
