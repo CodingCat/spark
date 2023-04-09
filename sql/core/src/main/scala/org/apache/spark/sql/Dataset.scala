@@ -198,7 +198,8 @@ class Dataset[T] private[sql](
     }
     queryExecution.sparkSession
   }
-
+  // scalastyle:off
+  println(queryExecution.logical.treeString)
   // A globally unique id of this Dataset.
   private val id = Dataset.curId.getAndIncrement()
 
@@ -208,8 +209,6 @@ class Dataset[T] private[sql](
   // you wrap it with `withNewExecutionId` if this actions doesn't call other action.
 
   def this(sparkSession: SparkSession, logicalPlan: LogicalPlan, encoder: Encoder[T]) = {
-    // scalastyle:off
-    println(logicalPlan.treeString)
     this(sparkSession.sessionState.executePlan(logicalPlan), encoder)
   }
 
@@ -471,6 +470,9 @@ class Dataset[T] private[sql](
   def as[U : Encoder]: Dataset[U] = {
     // scalastyle:off
     println("calling as")
+    // Nan's Note: oh, shit, here, we pass in the current dataset's logical plan,
+    // as a result, if we are doing something like trim some of the columns out, logicalPlan will
+    // contain the extra column
     Dataset[U](sparkSession, logicalPlan)
   }
 
