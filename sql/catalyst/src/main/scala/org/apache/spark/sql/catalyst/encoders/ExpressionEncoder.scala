@@ -81,6 +81,8 @@ object ExpressionEncoder {
    * name/positional binding is preserved.
    */
   def tuple(encoders: Seq[ExpressionEncoder[_]]): ExpressionEncoder[_] = {
+    // scalastyle:off
+    println("tuple")
     if (encoders.length > 22) {
       throw QueryExecutionErrors.elementsOfTupleExceedLimitError()
     }
@@ -192,6 +194,9 @@ object ExpressionEncoder {
    */
   class Serializer[T](private val expressions: Seq[Expression])
     extends (T => InternalRow) with Serializable {
+
+    // scalastyle:off
+    println(s"serializer for $expressions")
     @transient
     private[this] var inputRow: GenericInternalRow = _
 
@@ -199,6 +204,7 @@ object ExpressionEncoder {
     private[this] var extractProjection: UnsafeProjection = _
 
     override def apply(t: T): InternalRow = try {
+      println(t)
       if (extractProjection == null) {
         inputRow = new GenericInternalRow(1)
         extractProjection = GenerateUnsafeProjection.generate(expressions)
@@ -231,7 +237,8 @@ case class ExpressionEncoder[T](
     objDeserializer: Expression,
     clsTag: ClassTag[T])
   extends Encoder[T] {
-
+  // scalastyle:off
+  println(s"objSerilizer: ${objSerializer}\n objDeserializer: $objDeserializer")
   /**
    * A sequence of expressions, one for each top-level field that can be used to
    * extract the values from a raw object into an [[InternalRow]]:
@@ -346,6 +353,7 @@ case class ExpressionEncoder[T](
     analyzer.checkAnalysis(analyzedPlan)
     val resolved = SimplifyCasts(analyzedPlan).asInstanceOf[DeserializeToObject].deserializer
     val bound = BindReferences.bindReference(resolved, attrs)
+    println("resolveAndBind")
     copy(objDeserializer = bound)
   }
 
@@ -383,7 +391,12 @@ case class ExpressionEncoder[T](
    * `serializer.apply(..)` are allowed to return the same actual [[InternalRow]] object.  Thus,
    *  the caller should copy the result before making another call if required.
    */
-  def createSerializer(): Serializer[T] = new Serializer[T](optimizedSerializer)
+  def createSerializer(): Serializer[T] = {
+    // scalastyle:off
+    println("call createSerializer")
+    new Serializer[T](optimizedSerializer)
+  }
+
 
   /**
    * Create a deserializer that can convert a Spark SQL Row into an object of type `T`.

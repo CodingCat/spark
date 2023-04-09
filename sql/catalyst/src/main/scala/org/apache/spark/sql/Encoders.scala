@@ -223,6 +223,8 @@ object Encoders {
 
   /** A way to construct encoders using generic serializers. */
   private def genericSerializer[T: ClassTag](useKryo: Boolean): Encoder[T] = {
+    // scalastyle:off
+    println("calling genericSerializer")
     if (classTag[T].runtimeClass.isPrimitive) {
       throw QueryExecutionErrors.primitiveTypesNotSupportedError()
     }

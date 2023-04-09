@@ -67,6 +67,8 @@ import org.apache.spark.util.Utils
  */
 object RowEncoder {
   def apply(schema: StructType): ExpressionEncoder[Row] = {
+    // scalastyle:off
+    println("RowEncoder")
     val cls = classOf[Row]
     val inputObject = BoundReference(0, ObjectType(cls), nullable = true)
     val serializer = serializerFor(inputObject, schema)

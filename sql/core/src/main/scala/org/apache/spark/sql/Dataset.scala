@@ -208,6 +208,8 @@ class Dataset[T] private[sql](
   // you wrap it with `withNewExecutionId` if this actions doesn't call other action.
 
   def this(sparkSession: SparkSession, logicalPlan: LogicalPlan, encoder: Encoder[T]) = {
+    // scalastyle:off
+    println(logicalPlan.treeString)
     this(sparkSession.sessionState.executePlan(logicalPlan), encoder)
   }
 
@@ -437,7 +439,12 @@ class Dataset[T] private[sql](
    */
   // This is declared with parentheses to prevent the Scala compiler from treating
   // `ds.toDF("1")` as invoking this toDF and then apply on the returned DataFrame.
-  def toDF(): DataFrame = new Dataset[Row](queryExecution, RowEncoder(schema))
+  def toDF(): DataFrame = {
+    // scalastyle:off
+    println(s"calling toDF with ${schema.treeString}")
+    new Dataset[Row](queryExecution, RowEncoder(schema))
+  }
+
 
   /**
    * Returns a new Dataset where each record has been mapped on to the specified type. The
@@ -461,7 +468,12 @@ class Dataset[T] private[sql](
    * @group basic
    * @since 1.6.0
    */
-  def as[U : Encoder]: Dataset[U] = Dataset[U](sparkSession, logicalPlan)
+  def as[U : Encoder]: Dataset[U] = {
+    // scalastyle:off
+    println("calling as")
+    Dataset[U](sparkSession, logicalPlan)
+  }
+
 
   /**
    * Converts this strongly typed collection of data to generic `DataFrame` with columns renamed.
