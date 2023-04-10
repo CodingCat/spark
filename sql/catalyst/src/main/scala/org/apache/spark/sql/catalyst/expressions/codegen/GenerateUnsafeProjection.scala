@@ -363,6 +363,7 @@ object GenerateUnsafeProjection extends CodeGenerator[Seq[Expression], UnsafePro
          |  }
          |
          |  public UnsafeRow apply(InternalRow ${ctx.INPUT_ROW}) {
+         |    super.apply(${ctx.INPUT_ROW});
          |    ${eval.code}
          |    return ${eval.value};
          |  }
@@ -370,7 +371,8 @@ object GenerateUnsafeProjection extends CodeGenerator[Seq[Expression], UnsafePro
          |  ${ctx.declareAddedFunctions()}
          |}
        """.stripMargin
-
+    // scalastyle:off
+    println(codeBody)
     val code = CodeFormatter.stripOverlappingComments(
       new CodeAndComment(codeBody, ctx.getPlaceHolderToComments()))
     logDebug(s"code for ${expressions.mkString(",")}:\n${CodeFormatter.format(code)}")

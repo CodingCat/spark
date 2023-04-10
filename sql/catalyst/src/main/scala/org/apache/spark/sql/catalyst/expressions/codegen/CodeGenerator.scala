@@ -1359,7 +1359,11 @@ abstract class CodeGenerator[InType <: AnyRef, OutType <: AnyRef] extends Loggin
     generate(bind(expressions, inputSchema))
 
   /** Generates the requested evaluator given already bound expression(s). */
-  def generate(expressions: InType): OutType = create(canonicalize(expressions))
+  def generate(expressions: InType): OutType = {
+    // scalastyle:off
+    println(this.getClass.getCanonicalName)
+    create(canonicalize(expressions))
+  }
 
   /**
    * Create a new codegen context for expression evaluator, used to store those

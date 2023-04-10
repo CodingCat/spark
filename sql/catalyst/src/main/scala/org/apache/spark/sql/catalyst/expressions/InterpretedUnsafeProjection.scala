@@ -80,6 +80,8 @@ class InterpretedUnsafeProjection(expressions: Array[Expression]) extends Unsafe
   }
 
   override def apply(row: InternalRow): UnsafeRow = {
+    // scalastyle:off
+    println("running unsafeproject.apply()")
     if (subExprEliminationEnabled) {
       runtime.setInput(row)
     }

@@ -110,7 +110,11 @@ object MutableProjection
  * CAUTION: the returned projection object should *not* be assumed to be thread-safe.
  */
 abstract class UnsafeProjection extends Projection {
-  override def apply(row: InternalRow): UnsafeRow
+  override def apply(row: InternalRow): UnsafeRow = {
+    // scalastyle:off
+    println(this.getClass.getCanonicalName)
+    null
+  }
 }
 
 /**
