@@ -18,7 +18,7 @@ package org.apache.spark.scheduler.cluster.k8s
 
 import io.fabric8.kubernetes.api.model.Pod
 
-sealed trait ExecutorPodState {
+private[k8s] trait ExecutorPodState {
   def pod: Pod
 }
 

@@ -170,6 +170,11 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
       case ReviveOffers =>
         makeOffers()
 
+      case PoisonKill(ex: Exception) =>
+        logError("terminated scheduler backend due to error", ex)
+        stop()
+        throw ex;
+
       case KillTask(taskId, executorId, interruptThread, reason) =>
         executorDataMap.get(executorId) match {
           case Some(executorInfo) =>
@@ -640,6 +645,12 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
   }
 
   def sufficientResourcesRegistered(): Boolean = true
+
+  def poisonKill(exception: Exception): Unit = {
+    logError("poisonKill scheduler backend", exception)
+    scheduler.sc.cancelAllJobs()
+    scheduler.sc.stop()
+  }
 
   override def isReady(): Boolean = {
     if (sufficientResourcesRegistered) {

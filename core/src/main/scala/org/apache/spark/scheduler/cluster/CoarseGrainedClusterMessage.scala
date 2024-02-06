@@ -88,6 +88,8 @@ private[spark] object CoarseGrainedClusterMessages {
   // Internal messages in driver
   case object ReviveOffers extends CoarseGrainedClusterMessage
 
+  case class PoisonKill(ex: Exception) extends CoarseGrainedClusterMessage
+
   case object StopDriver extends CoarseGrainedClusterMessage
 
   case object StopExecutor extends CoarseGrainedClusterMessage

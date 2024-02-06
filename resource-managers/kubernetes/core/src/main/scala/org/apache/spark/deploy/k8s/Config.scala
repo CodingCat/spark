@@ -543,6 +543,15 @@ private[spark] object Config extends Logging {
       .checkValue(delay => delay > 0, "delay must be a positive time value")
       .createWithDefaultString("30s")
 
+  val KUBERNETES_EXECUTOR_REGISTRATION_TIMEOUT =
+    ConfigBuilder("spark.kubernetes.executor.registrationTimeout")
+      .doc("for each resource profile, there has to be at least 1 executor successfully" +
+        " registered within this amount of time before we raise the failure")
+      .version("3.2.0")
+      .timeConf(TimeUnit.SECONDS)
+      .checkValue(delay => delay > 0, "delay must be a positive time value")
+      .createWithDefaultString("300s")
+
   val KUBERNETES_MAX_PENDING_PODS =
     ConfigBuilder("spark.kubernetes.allocation.maxPendingPods")
       .doc("Maximum number of pending PODs allowed during executor allocation for this " +

@@ -82,7 +82,8 @@ private[spark] class ExecutorPodsLifecycleManager(
             }
             inactivatedPods -= execId
 
-          case failed@PodFailed(_) =>
+          case failed@PodFailed(pod) =>
+            logInfo(s"${pod.getMetadata.getName} failed")
             val deleteFromK8s = !execIdsRemovedInThisRound.contains(execId)
             if (onFinalNonDeletedState(failed, execId, schedulerBackend, deleteFromK8s)) {
               execIdsRemovedInThisRound += execId

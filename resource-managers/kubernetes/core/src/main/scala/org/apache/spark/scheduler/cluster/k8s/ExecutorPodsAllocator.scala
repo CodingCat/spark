@@ -37,13 +37,43 @@ import org.apache.spark.internal.config.DYN_ALLOCATION_EXECUTOR_IDLE_TIMEOUT
 import org.apache.spark.resource.ResourceProfile
 import org.apache.spark.util.{Clock, Utils}
 
+
+private[spark] class ExecutorAllocationFailureHandler extends Logging {
+
+  private var executorPodsAllocator: ExecutorPodsAllocator = _
+
+  def setPodsAllocator(allocator: ExecutorPodsAllocator): Unit = {
+    this.executorPodsAllocator = allocator
+  }
+
+  def handleAllocationFailure(rpId: Int): Unit = {
+    val msg = s"cannot register any executor for resource profile" +
+      s" ${executorPodsAllocator.rpIdToResourceProfile(rpId)} within" +
+      s" ${executorPodsAllocator.executorRegistrationTimeoutSeconds} seconds"
+    logError(msg, new SparkException(msg))
+    executorPodsAllocator.scheduleBackend.stop()
+    executorPodsAllocator.scheduleBackend.poisonKill(new SparkException(msg))
+  }
+}
+
 private[spark] class ExecutorPodsAllocator(
     conf: SparkConf,
     secMgr: SecurityManager,
     executorBuilder: KubernetesExecutorBuilder,
     kubernetesClient: KubernetesClient,
     snapshotsStore: ExecutorPodsSnapshotsStore,
-    clock: Clock) extends Logging {
+    private[spark] val clock: Clock,
+    private var executorAllocationFailureHandler: Option[ExecutorAllocationFailureHandler] = None)
+  extends Logging {
+
+  if (executorAllocationFailureHandler.isEmpty) {
+    executorAllocationFailureHandler = Some(new ExecutorAllocationFailureHandler)
+  }
+
+  executorAllocationFailureHandler.foreach { e => e.setPodsAllocator(this)}
+
+  require(executorAllocationFailureHandler.nonEmpty, "executorAllocationFailureHandler has to" +
+    " be defined")
 
   private val EXECUTOR_ID_COUNTER = new AtomicInteger(0)
 
@@ -51,7 +81,7 @@ private[spark] class ExecutorPodsAllocator(
   // any resource profiles - https://issues.apache.org/jira/browse/SPARK-30749
   private val totalExpectedExecutorsPerResourceProfileId = new ConcurrentHashMap[Int, Int]()
 
-  private val rpIdToResourceProfile = new mutable.HashMap[Int, ResourceProfile]
+  private[k8s] val rpIdToResourceProfile = new mutable.HashMap[Int, ResourceProfile]
 
   private val podAllocationSize = conf.get(KUBERNETES_ALLOCATION_BATCH_SIZE)
 
@@ -73,6 +103,13 @@ private[spark] class ExecutorPodsAllocator(
     .get(KUBERNETES_DRIVER_POD_NAME)
 
   private val shouldDeleteExecutors = conf.get(KUBERNETES_DELETE_EXECUTORS)
+
+  private val rpIdToStartTime = new mutable.HashMap[Int, Long]()
+
+  private[spark] val executorIdToRPId = new mutable.HashMap[String, Int]()
+
+  private[k8s] lazy val executorRegistrationTimeoutSeconds = conf.get(
+    KUBERNETES_EXECUTOR_REGISTRATION_TIMEOUT)
 
   val driverPod = kubernetesDriverPodName
     .map(name => Option(kubernetesClient.pods()
@@ -101,6 +138,8 @@ private[spark] class ExecutorPodsAllocator(
   // a snapshot from the API server. This is used to deny registration from these executors
   // if they happen to come up before the deletion takes effect.
   @volatile private var deletedExecutorIds = Set.empty[Long]
+
+  private[k8s] var scheduleBackend: KubernetesClusterSchedulerBackend = _
 
   def start(applicationId: String, schedulerBackend: KubernetesClusterSchedulerBackend): Unit = {
     driverPod.foreach { pod =>
@@ -131,10 +170,62 @@ private[spark] class ExecutorPodsAllocator(
 
   def isDeleted(executorId: String): Boolean = deletedExecutorIds.contains(executorId.toLong)
 
+  def setSchedulerBackend(backend: KubernetesClusterSchedulerBackend): Unit = {
+    scheduleBackend = backend
+  }
+
+  private def detectFailedResourceProfileAllocation(snapshots: Seq[ExecutorPodsSnapshot]): Unit = {
+    def trackStartTime(pod: Pod): Unit = {
+      val resourceProfileId = pod.getMetadata.getLabels.get(SPARK_RESOURCE_PROFILE_ID_LABEL).toInt
+      if (!rpIdToStartTime.contains(resourceProfileId)) {
+        rpIdToStartTime += resourceProfileId -> clock.getTimeMillis()
+      }
+    }
+    snapshots.foreach { snapshot =>
+      snapshot.executorPods.foreach { case (_, state) =>
+        state match {
+          case PodRunning(pod) =>
+            trackStartTime(pod)
+            executorIdToRPId +=
+              pod.getMetadata.getName -> pod.getMetadata.getLabels.get(
+                SPARK_RESOURCE_PROFILE_ID_LABEL).toInt
+          case PodSucceeded(pod) =>
+            trackStartTime(pod)
+            executorIdToRPId +=
+              pod.getMetadata.getName -> pod.getMetadata.getLabels.get(
+                SPARK_RESOURCE_PROFILE_ID_LABEL).toInt
+          case PodFailed(pod) =>
+            trackStartTime(pod)
+            executorIdToRPId -= pod.getMetadata.getName
+          case s: ExecutorPodState =>
+            trackStartTime(s.pod)
+        }
+      }
+    }
+    val allRPIds = rpIdToStartTime.keySet
+    val allSucceededRPIds = executorIdToRPId.values.toSet
+    if (allSucceededRPIds.nonEmpty) {
+      logInfo(s"successfully registered for ${allSucceededRPIds.mkString(",")}")
+      logInfo(s"running or succeeded executors: ${executorIdToRPId.keySet}")
+    }
+    val succeededResourceProfiles = executorIdToRPId.values.toSet
+    val suspiciousRPIds = allRPIds -- allSucceededRPIds
+    val ts = clock.getTimeMillis()
+    suspiciousRPIds.foreach { rpId =>
+      if (!succeededResourceProfiles.contains(rpId) && ts - rpIdToStartTime(rpId) >
+        executorRegistrationTimeoutSeconds * 1000) {
+        executorAllocationFailureHandler.get.handleAllocationFailure(rpId)
+      }
+    }
+  }
+
   private def onNewSnapshots(
       applicationId: String,
       schedulerBackend: KubernetesClusterSchedulerBackend,
       snapshots: Seq[ExecutorPodsSnapshot]): Unit = {
+
+    detectFailedResourceProfileAllocation(snapshots)
+
     val k8sKnownExecIds = snapshots.flatMap(_.executorPods.keys)
     newlyCreatedExecutors --= k8sKnownExecIds
     schedulerKnownNewlyCreatedExecs --= k8sKnownExecIds

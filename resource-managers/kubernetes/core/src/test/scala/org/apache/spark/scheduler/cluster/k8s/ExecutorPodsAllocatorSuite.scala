@@ -44,6 +44,13 @@ import org.apache.spark.resource._
 import org.apache.spark.scheduler.cluster.k8s.ExecutorLifecycleTestUtils._
 import org.apache.spark.util.ManualClock
 
+class ExecutorPodsAllocationFailureDummyHandler extends ExecutorAllocationFailureHandler {
+
+  override def handleAllocationFailure(rpId: Int): Unit = {
+    throw new SparkException(s"failed to allocate for resource profile $rpId")
+  }
+}
+
 class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
 
   private val driverPodName = "driver"
@@ -60,6 +67,7 @@ class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
   private val conf = new SparkConf()
     .set(KUBERNETES_DRIVER_POD_NAME, driverPodName)
     .set(DYN_ALLOCATION_EXECUTOR_IDLE_TIMEOUT.key, "10s")
+    .set(KUBERNETES_EXECUTOR_REGISTRATION_TIMEOUT.key, "30s")
 
   private val defaultProfile: ResourceProfile = ResourceProfile.getOrCreateDefaultProfile(conf)
   private val podAllocationSize = conf.get(KUBERNETES_ALLOCATION_BATCH_SIZE)
@@ -114,7 +122,8 @@ class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
     snapshotsStore = new DeterministicExecutorPodsSnapshotsStore()
     waitForExecutorPodsClock = new ManualClock(0L)
     podsAllocatorUnderTest = new ExecutorPodsAllocator(
-      conf, secMgr, executorBuilder, kubernetesClient, snapshotsStore, waitForExecutorPodsClock)
+      conf, secMgr, executorBuilder, kubernetesClient, snapshotsStore, waitForExecutorPodsClock,
+      Some(new ExecutorPodsAllocationFailureDummyHandler))
     when(schedulerBackend.getExecutorIds).thenReturn(Seq.empty)
     podsAllocatorUnderTest.start(TEST_SPARK_APP_ID, schedulerBackend)
   }
@@ -204,6 +213,76 @@ class ExecutorPodsAllocatorSuite extends SparkFunSuite with BeforeAndAfter {
       verify(podOperations).create(podWithAttachedContainerForId(nextId))
     }
     verify(podOperations, never()).create(podWithAttachedContainerForId(podAllocationSize + 1))
+  }
+
+  test("fail the executor allocator after failing requesting executors with default profile ") {
+    podsAllocatorUnderTest.setTotalExpectedExecutors(Map(defaultProfile -> 2))
+    waitForExecutorPodsClock.setTime(0)
+    snapshotsStore.updatePod(failedExecutorWithoutDeletion(0))
+    snapshotsStore.notifySubscribers()
+    waitForExecutorPodsClock.setTime(35000)
+    snapshotsStore.updatePod(failedExecutorWithoutDeletion(1))
+    val ex = intercept[SparkException] {
+      snapshotsStore.notifySubscribers()
+    }
+    assert(ex.getMessage === "failed to allocate for resource profile 0")
+  }
+
+  test("fail the executor allocator after failing requesting executors with another profile ") {
+    val rprof = new ResourceProfileBuilder()
+    val taskReq = new TaskResourceRequests().resource("gpu", 1)
+    val execReq =
+      new ExecutorResourceRequests().resource("gpu", 2, "myscript", "nvidia")
+    val rp = rprof.require(taskReq).require(execReq).build()
+    podsAllocatorUnderTest.setTotalExpectedExecutors(Map(defaultProfile -> 2, rp -> 2))
+    waitForExecutorPodsClock.setTime(0)
+    snapshotsStore.updatePod(runningExecutor(0, 0))
+    snapshotsStore.updatePod(runningExecutor(1, 0))
+    snapshotsStore.updatePod(failedExecutorWithoutDeletion(1, 1))
+    snapshotsStore.notifySubscribers()
+    waitForExecutorPodsClock.setTime(35000)
+    snapshotsStore.updatePod(failedExecutorWithoutDeletion(2, 1))
+    val ex = intercept[SparkException] {
+      snapshotsStore.notifySubscribers()
+    }
+    assert(ex.getMessage === "failed to allocate for resource profile 1")
+  }
+
+  test("fail the executor allocator even we get some running executor in the mid") {
+    podsAllocatorUnderTest.setTotalExpectedExecutors(Map(defaultProfile -> 2))
+    waitForExecutorPodsClock.setTime(0)
+    snapshotsStore.updatePod(runningExecutor(0))
+    snapshotsStore.notifySubscribers()
+    waitForExecutorPodsClock.setTime(35000)
+    snapshotsStore.updatePod(failedExecutorWithoutDeletion(0))
+    val ex = intercept[SparkException] {
+      snapshotsStore.notifySubscribers()
+    }
+    assert(ex.getMessage === "failed to allocate for resource profile 0")
+  }
+
+  test("not failing the allocator if there is executor successfully registered") {
+    podsAllocatorUnderTest.setTotalExpectedExecutors(Map(defaultProfile -> 2))
+    waitForExecutorPodsClock.setTime(0)
+    snapshotsStore.updatePod(runningExecutor(0))
+    snapshotsStore.updatePod(runningExecutor(1))
+    snapshotsStore.notifySubscribers()
+    waitForExecutorPodsClock.setTime(35000)
+    snapshotsStore.updatePod(failedExecutorWithoutDeletion(0))
+    snapshotsStore.notifySubscribers()
+    assert(podsAllocatorUnderTest.executorIdToRPId === Map("spark-executor-1" -> 0))
+  }
+
+  test("not failing the allocator even the resource is not registered in time") {
+    podsAllocatorUnderTest.setTotalExpectedExecutors(Map(defaultProfile -> 2))
+    waitForExecutorPodsClock.setTime(0)
+    snapshotsStore.notifySubscribers()
+    waitForExecutorPodsClock.setTime(40000)
+    snapshotsStore.updatePod(runningExecutor(0))
+    snapshotsStore.updatePod(runningExecutor(1))
+    snapshotsStore.notifySubscribers()
+    assert(podsAllocatorUnderTest.executorIdToRPId === Map("spark-executor-1" -> 0,
+      "spark-executor-0" -> 0))
   }
 
   test("Request executors in batches. Allow another batch to be requested if" +

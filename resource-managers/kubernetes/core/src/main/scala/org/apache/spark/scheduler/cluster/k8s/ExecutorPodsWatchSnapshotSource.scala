@@ -42,6 +42,8 @@ class ExecutorPodsWatchSnapshotSource(
 
   private var watchConnection: Closeable = _
 
+  private var schedulerBackend: KubernetesClusterSchedulerBackend = _
+
   @Since("3.1.3")
   def start(applicationId: String): Unit = {
     require(watchConnection == null, "Cannot start the watcher twice.")
@@ -63,7 +65,12 @@ class ExecutorPodsWatchSnapshotSource(
     }
   }
 
+  def setSchedulerBackend(backend: KubernetesClusterSchedulerBackend): Unit = {
+    schedulerBackend = backend
+  }
+
   private class ExecutorPodsWatcher extends Watcher[Pod] {
+
     override def eventReceived(action: Action, pod: Pod): Unit = {
       val podName = pod.getMetadata.getName
       logDebug(s"Received executor pod update for pod named $podName, action $action")
